@@ -1,6 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
-val appVersion = "1.0.0"
+val appVersion = "1.0.1"
 val githubOwner = "lucascosta95"
 val githubRepo = "aws-local-manager"
 
