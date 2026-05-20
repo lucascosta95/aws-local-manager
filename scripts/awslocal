@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ── Configuração ────────────────────────────────────────────────────────────
+REPO="lucascosta95/aws-local-manager"
+CACHE_DIR="$HOME/.aws-local-manager"
+JAR_PATH="$CACHE_DIR/app.jar"
+VERSION_FILE="$CACHE_DIR/version"
+API_URL="https://api.github.com/repos/$REPO/releases/latest"
+
+# ── Verificações de pré-requisito ───────────────────────────────────────────
+if ! command -v java &>/dev/null; then
+  echo "❌  Java não encontrado. Instale o JDK 17+ e tente novamente."
+  echo "    Download: https://adoptium.net"
+  exit 1
+fi
+
+JAVA_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
+if [[ "$JAVA_VERSION" -lt 17 ]]; then
+  echo "❌  Java $JAVA_VERSION detectado. É necessário JDK 17 ou superior."
+  exit 1
+fi
+
+# ── Verificação de atualização ───────────────────────────────────────────────
+mkdir -p "$CACHE_DIR"
+
+CACHED_VERSION=""
+if [[ -f "$VERSION_FILE" ]]; then
+  CACHED_VERSION=$(cat "$VERSION_FILE")
+fi
+
+RELEASE_JSON=""
+LATEST_VERSION=""
+DOWNLOAD_URL=""
+
+if command -v curl &>/dev/null; then
+  RELEASE_JSON=$(curl -sf "$API_URL" || echo "")
+elif command -v wget &>/dev/null; then
+  RELEASE_JSON=$(wget -qO- "$API_URL" || echo "")
+else
+  echo "⚠️  curl e wget não encontrados. Usando versão em cache (se disponível)."
+fi
+
+if [[ -n "${RELEASE_JSON:-}" ]]; then
+  LATEST_VERSION=$(echo "$RELEASE_JSON" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+  DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep '"browser_download_url"' | grep '\-all\.jar' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
+fi
+
+# ── Download se necessário ───────────────────────────────────────────────────
+if [[ -n "$LATEST_VERSION" && "$LATEST_VERSION" != "$CACHED_VERSION" && -n "$DOWNLOAD_URL" ]]; then
+  echo "🔄  Baixando AWS Local Manager $LATEST_VERSION..."
+  if command -v curl &>/dev/null; then
+    curl -L --progress-bar -o "$JAR_PATH" "$DOWNLOAD_URL"
+  else
+    wget -q --show-progress -O "$JAR_PATH" "$DOWNLOAD_URL"
+  fi
+  echo "$LATEST_VERSION" > "$VERSION_FILE"
+  echo "✅  Atualizado para $LATEST_VERSION"
+fi
+
+# ── Verificação final do jar ─────────────────────────────────────────────────
+if [[ ! -f "$JAR_PATH" ]]; then
+  echo "❌  Nenhuma versão encontrada em cache e não foi possível baixar."
+  echo "    Verifique sua conexão ou baixe manualmente em:"
+  echo "    https://github.com/$REPO/releases/latest"
+  exit 1
+fi
+
+# ── Execução ─────────────────────────────────────────────────────────────────
+exec java -jar "$JAR_PATH" "$@"

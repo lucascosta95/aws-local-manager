@@ -1,0 +1,41 @@
+complexity:
+  LongMethod:
+    threshold: 30
+  LongParameterList:
+    functionThreshold: 4
+  CyclomaticComplexMethod:
+    threshold: 12
+  TooManyFunctions:
+    thresholdInClasses: 40
+
+naming:
+  FunctionNaming:
+    active: true
+    ignoreAnnotated: [ 'Composable' ]
+  VariableNaming:
+    active: true
+  ClassNaming:
+    active: true
+  ConstructorParameterNaming:
+    active: true
+
+style:
+  MagicNumber:
+    active: true
+    ignoreNumbers: [ '-1', '0', '1', '2' ]
+  UnusedPrivateMember:
+    active: true
+  ForbiddenComment:
+    active: true
+    comments: [ 'TODO:', 'FIXME:', 'HACK:' ]
+  NoTabs:
+    active: true
+  MaxLineLength:
+    maxLineLength: 160
+    excludeImportStatements: true
+
+coroutines:
+  GlobalCoroutineUsage:
+    active: true
+  RedundantSuspendModifier:
+    active: true
