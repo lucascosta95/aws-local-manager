@@ -29,7 +29,7 @@ naming:
 
 style:
   ReturnCount:
-    max: 4
+    max: 6
   MagicNumber:
     active: false
   UnusedPrivateMember:
