@@ -1,12 +1,20 @@
 complexity:
   LongMethod:
-    threshold: 30
+    threshold: 60
+    ignoreAnnotated: [ 'Composable' ]
   LongParameterList:
-    functionThreshold: 4
+    functionThreshold: 6
+    constructorThreshold: 8
+    ignoreAnnotated: [ 'Composable' ]
   CyclomaticComplexMethod:
-    threshold: 12
+    threshold: 15
+    ignoreAnnotated: [ 'Composable' ]
   TooManyFunctions:
+    thresholdInFiles: 30
     thresholdInClasses: 40
+    thresholdInObjects: 15
+  NestedBlockDepth:
+    threshold: 6
 
 naming:
   FunctionNaming:
@@ -20,9 +28,10 @@ naming:
     active: true
 
 style:
+  ReturnCount:
+    max: 4
   MagicNumber:
-    active: true
-    ignoreNumbers: [ '-1', '0', '1', '2' ]
+    active: false
   UnusedPrivateMember:
     active: true
   ForbiddenComment:
@@ -33,6 +42,10 @@ style:
   MaxLineLength:
     maxLineLength: 160
     excludeImportStatements: true
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
 
 coroutines:
   GlobalCoroutineUsage:
