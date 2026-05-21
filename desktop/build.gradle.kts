@@ -72,6 +72,15 @@ compose.resources {
     generateResClass = always
 }
 
+val skikoNatives by configurations.creating
+
+dependencies {
+    skikoNatives("org.jetbrains.skiko:skiko-awt-runtime-macos-arm64:0.8.18")
+    skikoNatives("org.jetbrains.skiko:skiko-awt-runtime-macos-x64:0.8.18")
+    skikoNatives("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.8.18")
+    skikoNatives("org.jetbrains.skiko:skiko-awt-runtime-linux-arm64:0.8.18")
+}
+
 tasks.register<Jar>("fatJar") {
     dependsOn("desktopJar")
     archiveBaseName.set("aws-local-manager")
@@ -89,6 +98,7 @@ tasks.register<Jar>("fatJar") {
             if (it.isDirectory) it else zipTree(it)
         },
     )
+    from(skikoNatives.map { zipTree(it) })
     with(tasks.getByName<Jar>("desktopJar"))
 }
 
