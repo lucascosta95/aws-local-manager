@@ -153,19 +153,21 @@ fun InspectorScreen(
                 ) {
                     state.handlers.forEachIndexed { index, handler ->
                         val isSelected = index == selectedIndex
-                        val contentColor = if (isSelected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        val contentColor =
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
                         Row(
-                            modifier = Modifier
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = ripple(bounded = true),
-                                    onClick = { viewModel.selectHandler(handler) },
-                                )
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            modifier =
+                                Modifier
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = ripple(bounded = true),
+                                        onClick = { viewModel.selectHandler(handler) },
+                                    )
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
@@ -197,10 +199,11 @@ fun InspectorScreen(
                     }
                 }
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .background(MaterialTheme.colorScheme.primary),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .background(MaterialTheme.colorScheme.primary),
                 )
             }
 
@@ -215,8 +218,9 @@ fun InspectorScreen(
                 )
 
                 Box(
-                    modifier = Modifier.width(1.dp).fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.outlineVariant),
+                    modifier =
+                        Modifier.width(1.dp).fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant),
                 )
 
                 DetailPanel(
@@ -306,43 +310,50 @@ private fun ResourceListItem(
 ) {
     val strings = LocalInspectorStrings.current
     val summaryText = localizedSummary(resource, strings)
-    val summaryColor = if (resource.summaryCount != null && resource.summaryCount > 0L) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val summaryColor =
+        if (resource.summaryCount != null && resource.summaryCount > 0L) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-            .height(IntrinsicSize.Min)
-            .clip(RoundedCornerShape(6.dp))
-            .background(
-                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                else MaterialTheme.colorScheme.surface,
-            )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true),
-                onClick = onClick,
-            ),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .height(IntrinsicSize.Min)
+                .clip(RoundedCornerShape(6.dp))
+                .background(
+                    if (isSelected) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+                )
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(bounded = true),
+                    onClick = onClick,
+                ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (isSelected) {
             Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.primary),
+                modifier =
+                    Modifier
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary),
             )
         } else {
             Spacer(modifier = Modifier.width(4.dp))
         }
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
             Text(
                 resource.name,
@@ -440,40 +451,45 @@ private fun DetailPanel(
 
             state.detail != null -> {
                 when (val detail = state.detail!!) {
-                    is InspectorDetail.SqsDetail -> SqsDetailView(
-                        detail = detail,
-                        isLoadingAction = state.isLoadingSubDetail,
-                        onPurge = { viewModel.performAction(SqsInspectorHandler.ACTION_PURGE) },
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    is InspectorDetail.SqsDetail ->
+                        SqsDetailView(
+                            detail = detail,
+                            isLoadingAction = state.isLoadingSubDetail,
+                            onPurge = { viewModel.performAction(SqsInspectorHandler.ACTION_PURGE) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
 
-                    is InspectorDetail.StepFunctionsDetail -> StepFunctionsDetailView(
-                        detail = detail,
-                        isLoadingSubDetail = state.isLoadingSubDetail,
-                        onSelectExecution = { viewModel.selectDetailItem(it.executionArn) },
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    is InspectorDetail.StepFunctionsDetail ->
+                        StepFunctionsDetailView(
+                            detail = detail,
+                            isLoadingSubDetail = state.isLoadingSubDetail,
+                            onSelectExecution = { viewModel.selectDetailItem(it.executionArn) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
 
-                    is InspectorDetail.DynamoDetail -> DynamoDetailView(
-                        detail = detail,
-                        isLoadingMore = state.isLoadingSubDetail,
-                        onLoadMore = viewModel::loadMoreItems,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    is InspectorDetail.DynamoDetail ->
+                        DynamoDetailView(
+                            detail = detail,
+                            isLoadingMore = state.isLoadingSubDetail,
+                            onLoadMore = viewModel::loadMoreItems,
+                            modifier = Modifier.fillMaxSize(),
+                        )
 
-                    is InspectorDetail.S3Detail -> S3DetailView(
-                        detail = detail,
-                        resourceName = state.selectedResource?.name ?: "",
-                        onNavigate = viewModel::navigateToPath,
-                        onNavigateUp = {
-                            val prefix = detail.currentPrefix
-                            val parent = prefix.trimEnd('/').substringBeforeLast('/').let {
-                                if (it.isEmpty()) "" else "$it/"
-                            }
-                            viewModel.navigateToPath(parent)
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    is InspectorDetail.S3Detail ->
+                        S3DetailView(
+                            detail = detail,
+                            resourceName = state.selectedResource?.name ?: "",
+                            onNavigate = viewModel::navigateToPath,
+                            onNavigateUp = {
+                                val prefix = detail.currentPrefix
+                                val parent =
+                                    prefix.trimEnd('/').substringBeforeLast('/').let {
+                                        if (it.isEmpty()) "" else "$it/"
+                                    }
+                                viewModel.navigateToPath(parent)
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
                 }
             }
 
@@ -582,14 +598,15 @@ private fun SqsMessageItem(message: SqsInspectorMessage) {
     var expanded by remember(message.messageId) { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true),
-                onClick = { expanded = !expanded },
-            )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(bounded = true),
+                    onClick = { expanded = !expanded },
+                )
+                .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -693,7 +710,11 @@ private fun StepFunctionsDetailView(
         Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(16.dp)) {
             if (detail.selectedExecution == null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(strings.inspectorSfnSelectExecution, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        strings.inspectorSfnSelectExecution,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             } else if (isLoadingSubDetail) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -733,15 +754,16 @@ private fun SfnExecutionItem(
     val bgColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(bgColor)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true),
-                onClick = onClick,
-            )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(bgColor)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(bounded = true),
+                    onClick = onClick,
+                )
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
@@ -801,7 +823,11 @@ private fun DynamoDetailView(
 
         if (detail.items.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(strings.inspectorDynamoEmpty, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    strings.inspectorDynamoEmpty,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         } else {
             val hScrollState = rememberScrollState()
@@ -864,7 +890,10 @@ private fun DynamoTableHeader(columns: List<String>) {
 }
 
 @Composable
-private fun DynamoTableRow(item: Map<String, String>, columns: List<String>) {
+private fun DynamoTableRow(
+    item: Map<String, String>,
+    columns: List<String>,
+) {
     Row(modifier = Modifier.fillMaxWidth()) {
         columns.forEach { col ->
             Text(
@@ -900,7 +929,11 @@ private fun S3DetailView(
 
         if (detail.entries.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(strings.inspectorS3Empty, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    strings.inspectorS3Empty,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         } else {
             val listState = rememberLazyListState()
@@ -964,14 +997,21 @@ private fun S3ObjectRow(
     onClick: (() -> Unit)?,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true),
-                onClick = onClick,
-            ) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .then(
+                    if (onClick != null) {
+                        Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true),
+                            onClick = onClick,
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -1058,7 +1098,10 @@ private fun CodeBlock(text: String) {
     }
 }
 
-private fun localizedSummary(resource: InspectorResource, strings: InspectorStrings): String =
+private fun localizedSummary(
+    resource: InspectorResource,
+    strings: InspectorStrings,
+): String =
     when (resource.summaryType) {
         "sqs" -> {
             val count = resource.summaryCount
@@ -1070,15 +1113,21 @@ private fun localizedSummary(resource: InspectorResource, strings: InspectorStri
         }
         "dynamo" -> {
             val count = resource.summaryCount ?: 0L
-            if (count == 1L) strings.inspectorSummaryDynamoSingular.replace("{count}", "1")
-            else strings.inspectorSummaryDynamoPlural.replace("{count}", count.toString())
+            if (count == 1L) {
+                strings.inspectorSummaryDynamoSingular.replace("{count}", "1")
+            } else {
+                strings.inspectorSummaryDynamoPlural.replace("{count}", count.toString())
+            }
         }
         "sfn" -> strings.inspectorSummarySfn
         "s3" -> strings.inspectorSummaryS3
         else -> ""
     }
 
-private fun localizedSfnStatus(status: String, strings: InspectorStrings): String =
+private fun localizedSfnStatus(
+    status: String,
+    strings: InspectorStrings,
+): String =
     when (status) {
         "RUNNING" -> strings.inspectorSfnStatusRunning
         "SUCCEEDED" -> strings.inspectorSfnStatusSucceeded

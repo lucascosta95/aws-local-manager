@@ -175,7 +175,10 @@ class InspectorViewModel(
         }
     }
 
-    private suspend fun loadDetailFor(endpoint: String, resource: InspectorResource) {
+    private suspend fun loadDetailFor(
+        endpoint: String,
+        resource: InspectorResource,
+    ) {
         val handler = _state.value.selectedHandler ?: return
         _state.update { it.copy(isLoadingDetail = true, detailError = null) }
         runCatching { handler.loadDetail(endpoint, resource) }
@@ -192,17 +195,18 @@ class InspectorViewModel(
         scope.launch {
             val intervalSeconds = preferencesRepository.preferences.first().pollingIntervalSeconds
             if (intervalSeconds <= 0) return@launch
-            pollingJob = scope.launch {
-                while (isActive) {
-                    delay(intervalSeconds.toLong().seconds)
-                    val handler = _state.value.selectedHandler ?: continue
-                    val endpoint = preferencesRepository.preferences.first().endpoint
-                    runCatching { handler.loadResources(endpoint) }
-                        .onSuccess { resources ->
-                            _state.update { it.copy(resources = resources, lastUpdated = currentTime()) }
-                        }
+            pollingJob =
+                scope.launch {
+                    while (isActive) {
+                        delay(intervalSeconds.toLong().seconds)
+                        val handler = _state.value.selectedHandler ?: continue
+                        val endpoint = preferencesRepository.preferences.first().endpoint
+                        runCatching { handler.loadResources(endpoint) }
+                            .onSuccess { resources ->
+                                _state.update { it.copy(resources = resources, lastUpdated = currentTime()) }
+                            }
+                    }
                 }
-            }
         }
     }
 

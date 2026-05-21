@@ -12,8 +12,7 @@ class DynamoDbHealthProbe(
 
     private val clientCache = ConcurrentHashMap<String, AwsDynamoDbClient>()
 
-    private fun clientFor(endpoint: String): AwsDynamoDbClient =
-        clientCache.computeIfAbsent(endpoint, clientFactory)
+    private fun clientFor(endpoint: String): AwsDynamoDbClient = clientCache.computeIfAbsent(endpoint, clientFactory)
 
     override suspend fun check(endpoint: String): AppServiceStatus = probeResources { clientFor(endpoint).listTables().getOrThrow() }
 }

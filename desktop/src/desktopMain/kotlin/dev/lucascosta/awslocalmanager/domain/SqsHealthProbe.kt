@@ -12,8 +12,7 @@ class SqsHealthProbe(
 
     private val clientCache = ConcurrentHashMap<String, AwsSqsClient>()
 
-    private fun clientFor(endpoint: String): AwsSqsClient =
-        clientCache.computeIfAbsent(endpoint, clientFactory)
+    private fun clientFor(endpoint: String): AwsSqsClient = clientCache.computeIfAbsent(endpoint, clientFactory)
 
     override suspend fun check(endpoint: String): AppServiceStatus = probeResources { clientFor(endpoint).listQueues().getOrThrow() }
 }

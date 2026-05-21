@@ -325,7 +325,7 @@ class RunningViewModel(
             return endpointRef.substringAfterLast("/").takeIf { it.isNotBlank() }
         }
 
-        if (endpointRef.startsWith("arn:")){
+        if (endpointRef.startsWith("arn:")) {
             return endpointRef.substringAfterLast(":").takeIf { it.isNotBlank() }
         }
 

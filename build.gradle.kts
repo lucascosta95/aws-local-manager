@@ -15,6 +15,7 @@ subprojects {
         outputToConsole.set(true)
         filter {
             exclude("**/generated/**")
+            exclude("**/build/**")
         }
     }
 }

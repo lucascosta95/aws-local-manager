@@ -12,8 +12,7 @@ class StepFunctionsHealthProbe(
 
     private val clientCache = ConcurrentHashMap<String, AwsStepFunctionsClient>()
 
-    private fun clientFor(endpoint: String): AwsStepFunctionsClient =
-        clientCache.computeIfAbsent(endpoint, clientFactory)
+    private fun clientFor(endpoint: String): AwsStepFunctionsClient = clientCache.computeIfAbsent(endpoint, clientFactory)
 
     override suspend fun check(endpoint: String): AppServiceStatus = probeResources { clientFor(endpoint).listStateMachines().getOrThrow() }
 }

@@ -16,7 +16,12 @@ import kotlinx.serialization.encoding.Encoder
 
 private object AppThemeSerializer : KSerializer<AppTheme> {
     override val descriptor = PrimitiveSerialDescriptor("AppTheme", PrimitiveKind.STRING)
-    override fun serialize(encoder: Encoder, value: AppTheme) = encoder.encodeString(value.name)
+
+    override fun serialize(
+        encoder: Encoder,
+        value: AppTheme,
+    ) = encoder.encodeString(value.name)
+
     override fun deserialize(decoder: Decoder): AppTheme =
         runCatching { AppTheme.valueOf(decoder.decodeString()) }.getOrElse { AppTheme.DARK }
 }
@@ -24,7 +29,6 @@ private object AppThemeSerializer : KSerializer<AppTheme> {
 @Serializable
 data class AppPreferences(
     val endpoint: String = EmulatorConfig.DEFAULT_ENDPOINT,
-
     @Serializable(with = AppThemeSerializer::class)
     val theme: AppTheme = AppTheme.DARK,
     val language: String = PORTUGUESE,

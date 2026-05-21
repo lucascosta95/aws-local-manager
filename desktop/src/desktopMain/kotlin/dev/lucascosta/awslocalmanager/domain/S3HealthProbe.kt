@@ -12,8 +12,7 @@ class S3HealthProbe(
 
     private val clientCache = ConcurrentHashMap<String, AwsS3Client>()
 
-    private fun clientFor(endpoint: String): AwsS3Client =
-        clientCache.computeIfAbsent(endpoint, clientFactory)
+    private fun clientFor(endpoint: String): AwsS3Client = clientCache.computeIfAbsent(endpoint, clientFactory)
 
     override suspend fun check(endpoint: String): AppServiceStatus = probeResources { clientFor(endpoint).listBuckets().getOrThrow() }
 }

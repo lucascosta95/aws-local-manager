@@ -10,7 +10,11 @@ interface InspectorServiceHandler {
     val icon: ImageVector
 
     suspend fun loadResources(endpoint: String): List<InspectorResource>
-    suspend fun loadDetail(endpoint: String, resource: InspectorResource): InspectorDetail
+
+    suspend fun loadDetail(
+        endpoint: String,
+        resource: InspectorResource,
+    ): InspectorDetail
 
     suspend fun loadSubDetail(
         endpoint: String,

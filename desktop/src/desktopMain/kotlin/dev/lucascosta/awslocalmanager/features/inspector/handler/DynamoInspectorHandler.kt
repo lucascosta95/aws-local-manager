@@ -32,10 +32,11 @@ class DynamoInspectorHandler : InspectorServiceHandler {
         buildClient(endpoint).use { client ->
             val tables = client.listTables(ListTablesRequest {}).tableNames ?: emptyList()
             tables.map { tableName ->
-                val itemCount = runCatching {
-                    client.describeTable(DescribeTableRequest { this.tableName = tableName })
-                        .table?.itemCount ?: 0L
-                }.getOrElse { 0L }
+                val itemCount =
+                    runCatching {
+                        client.describeTable(DescribeTableRequest { this.tableName = tableName })
+                            .table?.itemCount ?: 0L
+                    }.getOrElse { 0L }
                 InspectorResource(
                     id = tableName,
                     name = tableName,
@@ -45,7 +46,10 @@ class DynamoInspectorHandler : InspectorServiceHandler {
             }
         }
 
-    override suspend fun loadDetail(endpoint: String, resource: InspectorResource): InspectorDetail {
+    override suspend fun loadDetail(
+        endpoint: String,
+        resource: InspectorResource,
+    ): InspectorDetail {
         pageTokens.remove(resource.id)
         return scanPage(endpoint, resource, exclusiveStartKey = null, existingItems = emptyList())
     }
@@ -68,17 +72,19 @@ class DynamoInspectorHandler : InspectorServiceHandler {
         existingItems: List<Map<String, String>>,
     ): InspectorDetail.DynamoDetail =
         buildClient(endpoint).use { client ->
-            val response = client.scan(
-                ScanRequest {
-                    tableName = resource.id
-                    limit = PAGE_SIZE
-                    if (exclusiveStartKey != null) this.exclusiveStartKey = exclusiveStartKey
-                },
-            )
+            val response =
+                client.scan(
+                    ScanRequest {
+                        tableName = resource.id
+                        limit = PAGE_SIZE
+                        if (exclusiveStartKey != null) this.exclusiveStartKey = exclusiveStartKey
+                    },
+                )
             val rawItems = response.items ?: emptyList()
-            val newItems = rawItems.map { item ->
-                item.entries.associate { (k, v) -> k to attributeValueToString(v) }
-            }
+            val newItems =
+                rawItems.map { item ->
+                    item.entries.associate { (k, v) -> k to attributeValueToString(v) }
+                }
             val allItems = existingItems + newItems
             val columns = allItems.flatMap { it.keys }.distinct()
 

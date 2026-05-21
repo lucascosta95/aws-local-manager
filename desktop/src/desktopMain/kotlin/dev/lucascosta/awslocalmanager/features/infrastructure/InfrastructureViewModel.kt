@@ -50,7 +50,7 @@ class InfrastructureViewModel(
             selectedResources: Set<String>,
         ): Boolean =
             selectedResources.isNotEmpty() &&
-                    project?.resources?.map { it.tfLabel }?.toSet() == selectedResources
+                project?.resources?.map { it.tfLabel }?.toSet() == selectedResources
 
         fun computeAvailableTypes(project: InfraProject): List<AwsResourceDefinition> =
             project.resources

@@ -39,8 +39,10 @@ class S3InspectorHandler : InspectorServiceHandler {
             }
         }
 
-    override suspend fun loadDetail(endpoint: String, resource: InspectorResource): InspectorDetail =
-        listObjects(endpoint, bucket = resource.id, prefix = resource.currentPath)
+    override suspend fun loadDetail(
+        endpoint: String,
+        resource: InspectorResource,
+    ): InspectorDetail = listObjects(endpoint, bucket = resource.id, prefix = resource.currentPath)
 
     private suspend fun listObjects(
         endpoint: String,
@@ -48,38 +50,41 @@ class S3InspectorHandler : InspectorServiceHandler {
         prefix: String,
     ): InspectorDetail.S3Detail =
         buildClient(endpoint).use { client ->
-            val response = client.listObjectsV2(
-                ListObjectsV2Request {
-                    this.bucket = bucket
-                    this.delimiter = "/"
-                    if (prefix.isNotBlank()) this.prefix = prefix
-                },
-            )
-
-            val prefixEntries = (response.commonPrefixes ?: emptyList()).mapNotNull { cp ->
-                val fullPrefix = cp.prefix ?: return@mapNotNull null
-                val displayName = fullPrefix.removePrefix(prefix).trimEnd('/')
-                S3InspectorObject(
-                    key = fullPrefix,
-                    displayName = displayName,
-                    sizeBytes = 0,
-                    lastModified = "",
-                    isPrefix = true,
+            val response =
+                client.listObjectsV2(
+                    ListObjectsV2Request {
+                        this.bucket = bucket
+                        this.delimiter = "/"
+                        if (prefix.isNotBlank()) this.prefix = prefix
+                    },
                 )
-            }
 
-            val objectEntries = (response.contents ?: emptyList()).mapNotNull { obj ->
-                val key = obj.key ?: return@mapNotNull null
-                if (key == prefix) return@mapNotNull null
-                val displayName = key.removePrefix(prefix)
-                S3InspectorObject(
-                    key = key,
-                    displayName = displayName,
-                    sizeBytes = obj.size ?: 0L,
-                    lastModified = obj.lastModified?.toString() ?: "",
-                    isPrefix = false,
-                )
-            }
+            val prefixEntries =
+                (response.commonPrefixes ?: emptyList()).mapNotNull { cp ->
+                    val fullPrefix = cp.prefix ?: return@mapNotNull null
+                    val displayName = fullPrefix.removePrefix(prefix).trimEnd('/')
+                    S3InspectorObject(
+                        key = fullPrefix,
+                        displayName = displayName,
+                        sizeBytes = 0,
+                        lastModified = "",
+                        isPrefix = true,
+                    )
+                }
+
+            val objectEntries =
+                (response.contents ?: emptyList()).mapNotNull { obj ->
+                    val key = obj.key ?: return@mapNotNull null
+                    if (key == prefix) return@mapNotNull null
+                    val displayName = key.removePrefix(prefix)
+                    S3InspectorObject(
+                        key = key,
+                        displayName = displayName,
+                        sizeBytes = obj.size ?: 0L,
+                        lastModified = obj.lastModified?.toString() ?: "",
+                        isPrefix = false,
+                    )
+                }
 
             InspectorDetail.S3Detail(
                 entries = prefixEntries + objectEntries,

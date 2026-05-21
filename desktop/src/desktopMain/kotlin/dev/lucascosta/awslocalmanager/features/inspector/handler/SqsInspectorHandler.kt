@@ -33,14 +33,15 @@ class SqsInspectorHandler : InspectorServiceHandler {
             val urls = client.listQueues(ListQueuesRequest {}).queueUrls ?: emptyList()
             urls.map { url ->
                 val queueName = url.substringAfterLast("/")
-                val approxCount = runCatching {
-                    client.getQueueAttributes(
-                        GetQueueAttributesRequest {
-                            queueUrl = url
-                            attributeNames = listOf(QueueAttributeName.ApproximateNumberOfMessages)
-                        },
-                    ).attributes?.get(QueueAttributeName.ApproximateNumberOfMessages) ?: "0"
-                }.getOrElse { "?" }
+                val approxCount =
+                    runCatching {
+                        client.getQueueAttributes(
+                            GetQueueAttributesRequest {
+                                queueUrl = url
+                                attributeNames = listOf(QueueAttributeName.ApproximateNumberOfMessages)
+                            },
+                        ).attributes?.get(QueueAttributeName.ApproximateNumberOfMessages) ?: "0"
+                    }.getOrElse { "?" }
                 InspectorResource(
                     id = url,
                     name = queueName,
@@ -50,25 +51,31 @@ class SqsInspectorHandler : InspectorServiceHandler {
             }
         }
 
-    override suspend fun loadDetail(endpoint: String, resource: InspectorResource): InspectorDetail =
+    override suspend fun loadDetail(
+        endpoint: String,
+        resource: InspectorResource,
+    ): InspectorDetail =
         buildClient(endpoint).use { client ->
-            val response = client.receiveMessage(
-                ReceiveMessageRequest {
-                    queueUrl = resource.id
-                    maxNumberOfMessages = 10
-                    visibilityTimeout = 0
-                    waitTimeSeconds = 0
-                    messageAttributeNames = listOf("All")
-                },
-            )
-            val messages = (response.messages ?: emptyList()).map { msg ->
-                SqsInspectorMessage(
-                    messageId = msg.messageId ?: "",
-                    body = msg.body ?: "",
-                    attributes = msg.attributes?.entries
-                        ?.associate { (k, v) -> k.value to v } ?: emptyMap(),
+            val response =
+                client.receiveMessage(
+                    ReceiveMessageRequest {
+                        queueUrl = resource.id
+                        maxNumberOfMessages = 10
+                        visibilityTimeout = 0
+                        waitTimeSeconds = 0
+                        messageAttributeNames = listOf("All")
+                    },
                 )
-            }
+            val messages =
+                (response.messages ?: emptyList()).map { msg ->
+                    SqsInspectorMessage(
+                        messageId = msg.messageId ?: "",
+                        body = msg.body ?: "",
+                        attributes =
+                            msg.attributes?.entries
+                                ?.associate { (k, v) -> k.value to v } ?: emptyMap(),
+                    )
+                }
             InspectorDetail.SqsDetail(messages = messages, queueUrl = resource.id)
         }
 

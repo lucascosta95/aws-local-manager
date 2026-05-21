@@ -22,7 +22,8 @@ val generateBuildConfig by tasks.registering {
                 const val GITHUB_OWNER = "$githubOwner"
                 const val GITHUB_REPO = "$githubRepo"
             }
-            """.trimIndent(),
+            """.trimIndent()
+                .plus("\n"),
         )
     }
 }
@@ -83,9 +84,11 @@ tasks.register<Jar>("fatJar") {
         attributes["Implementation-Version"] = appVersion
     }
 
-    from(configurations["desktopRuntimeClasspath"].map {
-        if (it.isDirectory) it else zipTree(it)
-    })
+    from(
+        configurations["desktopRuntimeClasspath"].map {
+            if (it.isDirectory) it else zipTree(it)
+        },
+    )
     with(tasks.getByName<Jar>("desktopJar"))
 }
 
@@ -102,14 +105,21 @@ compose.desktop {
             vendor = "Lucas Costa"
             licenseFile.set(project.file("../LICENSE"))
 
-            jvmArgs += listOf(
-                "--add-opens", "java.base/sun.misc=ALL-UNNAMED",
-                "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-                "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
-                "--add-opens", "java.base/java.io=ALL-UNNAMED",
-                "--add-opens", "java.base/java.nio=ALL-UNNAMED",
-                "--add-opens", "java.base/java.util=ALL-UNNAMED",
-            )
+            jvmArgs +=
+                listOf(
+                    "--add-opens",
+                    "java.base/sun.misc=ALL-UNNAMED",
+                    "--add-opens",
+                    "java.base/java.lang=ALL-UNNAMED",
+                    "--add-opens",
+                    "java.base/java.lang.reflect=ALL-UNNAMED",
+                    "--add-opens",
+                    "java.base/java.io=ALL-UNNAMED",
+                    "--add-opens",
+                    "java.base/java.nio=ALL-UNNAMED",
+                    "--add-opens",
+                    "java.base/java.util=ALL-UNNAMED",
+                )
 
             linux {
                 debMaintainer = "awslocalmanager@gmail.com"
@@ -121,7 +131,6 @@ compose.desktop {
                 iconFile.set(project.file("src/desktopMain/resources/icon.png"))
                 bundleID = "dev.lucascosta.awslocalmanager"
             }
-
         }
 
         buildTypes.release.proguard {

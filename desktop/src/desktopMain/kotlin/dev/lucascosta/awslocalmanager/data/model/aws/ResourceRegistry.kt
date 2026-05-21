@@ -12,5 +12,4 @@ object ResourceRegistry {
     fun fromTerraformPrefix(prefix: String): AwsResourceDefinition? = definitions.find { it.terraformPrefix == prefix }
 
     fun fromHealthKey(key: String): AwsResourceDefinition? = definitions.find { it.healthKey == key.lowercase() }
-
 }

@@ -1,0 +1,9 @@
+title = "AWS Local Manager"
+
+[allowlist]
+  description = "Credenciais intencionais do emulador Floci"
+  regexes = [
+    '''access[_-]?key[\"']?\s*[:=]\s*[\"']?test[\"']?''',
+    '''secret[_-]?key[\"']?\s*[:=]\s*[\"']?test[\"']?''',
+    '''000000000000''',
+  ]

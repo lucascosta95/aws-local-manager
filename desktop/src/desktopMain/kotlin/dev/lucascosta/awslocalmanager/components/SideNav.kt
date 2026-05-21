@@ -150,7 +150,10 @@ fun SideNav(
     }
 }
 
-private fun isNavItemSelected(item: NavItem, currentScreen: Screen): Boolean =
+private fun isNavItemSelected(
+    item: NavItem,
+    currentScreen: Screen,
+): Boolean =
     when {
         item.screen == Screen.Project && currentScreen is Screen.Infrastructure -> true
         else -> currentScreen == item.screen

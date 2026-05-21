@@ -20,14 +20,20 @@ class StepFunctionsInspectorHandler : InspectorServiceHandler {
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun loadResources(endpoint: String): List<InspectorResource> {
-        val result = ProcessRunner.run(
-            command = listOf(
-                "aws", "stepfunctions", "list-state-machines",
-                "--query", "stateMachines[].stateMachineArn",
-                "--output", "text",
-            ),
-            config = ProcessConfig(envVars = ProcessRunner.awsEnvVars(endpoint)),
-        ).getOrElse { return emptyList() }
+        val result =
+            ProcessRunner.run(
+                command =
+                    listOf(
+                        "aws",
+                        "stepfunctions",
+                        "list-state-machines",
+                        "--query",
+                        "stateMachines[].stateMachineArn",
+                        "--output",
+                        "text",
+                    ),
+                config = ProcessConfig(envVars = ProcessRunner.awsEnvVars(endpoint)),
+            ).getOrElse { return emptyList() }
 
         if (result.exitCode != 0 || result.stdout.isBlank()) return emptyList()
 
@@ -40,21 +46,31 @@ class StepFunctionsInspectorHandler : InspectorServiceHandler {
         }
     }
 
-    override suspend fun loadDetail(endpoint: String, resource: InspectorResource): InspectorDetail {
-        val result = ProcessRunner.run(
-            command = listOf(
-                "aws", "stepfunctions", "list-executions",
-                "--state-machine-arn", resource.id,
-                "--output", "json",
-            ),
-            config = ProcessConfig(envVars = ProcessRunner.awsEnvVars(endpoint)),
-        ).getOrElse { return emptyStepFunctionsDetail() }
+    override suspend fun loadDetail(
+        endpoint: String,
+        resource: InspectorResource,
+    ): InspectorDetail {
+        val result =
+            ProcessRunner.run(
+                command =
+                    listOf(
+                        "aws",
+                        "stepfunctions",
+                        "list-executions",
+                        "--state-machine-arn",
+                        resource.id,
+                        "--output",
+                        "json",
+                    ),
+                config = ProcessConfig(envVars = ProcessRunner.awsEnvVars(endpoint)),
+            ).getOrElse { return emptyStepFunctionsDetail() }
 
         if (result.exitCode != 0) return emptyStepFunctionsDetail()
 
-        val executions = runCatching {
-            json.decodeFromString<SfnListExecutionsResponse>(result.stdout).executions
-        }.getOrElse { emptyList() }
+        val executions =
+            runCatching {
+                json.decodeFromString<SfnListExecutionsResponse>(result.stdout).executions
+            }.getOrElse { emptyList() }
 
         val sfnExecutions = executions.map { it.toModel() }
         val statusCounts = sfnExecutions.groupingBy { it.status }.eachCount()
@@ -74,24 +90,31 @@ class StepFunctionsInspectorHandler : InspectorServiceHandler {
         val sfnDetail = currentDetail as? InspectorDetail.StepFunctionsDetail ?: return null
         val execution = sfnDetail.executions.find { it.executionArn == subItemId } ?: return null
 
-        val result = ProcessRunner.run(
-            command = listOf(
-                "aws", "stepfunctions", "describe-execution",
-                "--execution-arn", subItemId,
-                "--output", "json",
-            ),
-            config = ProcessConfig(envVars = ProcessRunner.awsEnvVars(endpoint)),
-        ).getOrElse {
-            return sfnDetail.copy(selectedExecution = execution)
-        }
+        val result =
+            ProcessRunner.run(
+                command =
+                    listOf(
+                        "aws",
+                        "stepfunctions",
+                        "describe-execution",
+                        "--execution-arn",
+                        subItemId,
+                        "--output",
+                        "json",
+                    ),
+                config = ProcessConfig(envVars = ProcessRunner.awsEnvVars(endpoint)),
+            ).getOrElse {
+                return sfnDetail.copy(selectedExecution = execution)
+            }
 
         if (result.exitCode != 0) return sfnDetail.copy(selectedExecution = execution)
 
-        val description = runCatching {
-            json.decodeFromString<SfnDescribeExecutionResponse>(result.stdout)
-        }.getOrElse {
-            return sfnDetail.copy(selectedExecution = execution)
-        }
+        val description =
+            runCatching {
+                json.decodeFromString<SfnDescribeExecutionResponse>(result.stdout)
+            }.getOrElse {
+                return sfnDetail.copy(selectedExecution = execution)
+            }
 
         return sfnDetail.copy(
             selectedExecution = execution,
@@ -100,10 +123,11 @@ class StepFunctionsInspectorHandler : InspectorServiceHandler {
         )
     }
 
-    private fun emptyStepFunctionsDetail() = InspectorDetail.StepFunctionsDetail(
-        executions = emptyList(),
-        statusCounts = emptyMap(),
-    )
+    private fun emptyStepFunctionsDetail() =
+        InspectorDetail.StepFunctionsDetail(
+            executions = emptyList(),
+            statusCounts = emptyMap(),
+        )
 
     @Serializable
     private data class SfnListExecutionsResponse(
@@ -119,17 +143,20 @@ class StepFunctionsInspectorHandler : InspectorServiceHandler {
         val stopDate: Double? = null,
         val stateMachineArn: String = "",
     ) {
-        fun toModel() = SfnInspectorExecution(
-            executionArn = executionArn,
-            name = name,
-            status = status,
-            startDate = startDate.toLong().let {
-                java.time.Instant.ofEpochSecond(it).toString()
-            },
-            stopDate = stopDate?.toLong()?.let {
-                java.time.Instant.ofEpochSecond(it).toString()
-            },
-        )
+        fun toModel() =
+            SfnInspectorExecution(
+                executionArn = executionArn,
+                name = name,
+                status = status,
+                startDate =
+                    startDate.toLong().let {
+                        java.time.Instant.ofEpochSecond(it).toString()
+                    },
+                stopDate =
+                    stopDate?.toLong()?.let {
+                        java.time.Instant.ofEpochSecond(it).toString()
+                    },
+            )
     }
 
     @Serializable

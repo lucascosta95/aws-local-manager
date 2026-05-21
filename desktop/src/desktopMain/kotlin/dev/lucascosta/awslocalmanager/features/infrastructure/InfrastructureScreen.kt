@@ -174,10 +174,11 @@ fun InfrastructureScreen(
                         UnsupportedSelectionWarning(message = strings.infraAllSelectedUnsupportedWarning)
                     } else if (unsupportedSelectedCount > 0) {
                         UnsupportedSelectionWarning(
-                            message = strings.infraUnsupportedSelectionWarning.replace(
-                                "{count}",
-                                unsupportedSelectedCount.toString(),
-                            ),
+                            message =
+                                strings.infraUnsupportedSelectionWarning.replace(
+                                    "{count}",
+                                    unsupportedSelectedCount.toString(),
+                                ),
                         )
                     }
 

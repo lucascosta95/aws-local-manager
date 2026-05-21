@@ -13,7 +13,11 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 class PreferencesRepository {
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
     private val mutex = Mutex()
     private val prefsFile = File(System.getProperty(USER_HOME), "$APP_DATA_DIR_NAME/preferences.json")
 
@@ -22,25 +26,37 @@ class PreferencesRepository {
 
     private fun loadFromDisk(): AppPreferences =
         runCatching {
-            if (prefsFile.exists()) json.decodeFromString<AppPreferences>(prefsFile.readText())
-            else AppPreferences()
+            if (prefsFile.exists()) {
+                json.decodeFromString<AppPreferences>(prefsFile.readText())
+            } else {
+                AppPreferences()
+            }
         }.getOrElse { AppPreferences() }
 
-    private suspend fun save(prefs: AppPreferences) = mutex.withLock {
-        runCatching {
-            prefsFile.parentFile?.mkdirs()
-            prefsFile.writeText(json.encodeToString(prefs))
-            _preferences.value = prefs
+    private suspend fun save(prefs: AppPreferences) =
+        mutex.withLock {
+            runCatching {
+                prefsFile.parentFile?.mkdirs()
+                prefsFile.writeText(json.encodeToString(prefs))
+                _preferences.value = prefs
+            }
         }
-    }
 
     suspend fun updateEndpoint(endpoint: String) = save(_preferences.value.copy(endpoint = endpoint))
+
     suspend fun updateTheme(theme: AppTheme) = save(_preferences.value.copy(theme = theme))
+
     suspend fun updateLanguage(language: String) = save(_preferences.value.copy(language = language))
+
     suspend fun updatePollingInterval(seconds: Int) = save(_preferences.value.copy(pollingIntervalSeconds = seconds))
+
     suspend fun updateMaxHistory(max: Int) = save(_preferences.value.copy(maxHistory = max))
+
     suspend fun updateProjectsDir(dir: String) = save(_preferences.value.copy(projectsDir = dir))
+
     suspend fun updateAutoCheckEnv(enabled: Boolean) = save(_preferences.value.copy(autoCheckEnv = enabled))
+
     suspend fun updateSkippedVersion(version: String) = save(_preferences.value.copy(skippedVersion = version))
+
     suspend fun resetToDefaults() = save(AppPreferences())
 }
