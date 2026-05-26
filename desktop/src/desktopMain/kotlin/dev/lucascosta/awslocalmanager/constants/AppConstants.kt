@@ -26,7 +26,7 @@ object AppConstants {
     const val APPLICATION_OCTET_STREAM = "application/octet-stream"
 
     // Emulator
-    const val FLOCI_IMAGE = "hectorvent/floci:latest"
+    const val FLOCI_IMAGE = "floci/floci:1.5.19"
     const val EMULATOR_CONTAINER_NAME = "aws-local-manager-emulator"
     const val EMULATOR_PORT_MAPPING = "4566:4566"
     const val EMULATOR_HEALTH_PATH = "/_floci/health"
