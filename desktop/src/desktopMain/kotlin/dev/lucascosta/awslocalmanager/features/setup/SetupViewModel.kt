@@ -5,6 +5,7 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.COLIMA_COMMAND
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_READY_POLL_INTERVAL_MS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_READY_POLL_MAX_ATTEMPTS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_RUN_FAILED_MSG
+import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_SOCKET_BINDING
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMPTY_STRING
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_CONTAINER_NAME
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_PORT_MAPPING
@@ -20,11 +21,7 @@ import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
@@ -235,6 +232,8 @@ class SetupViewModel(
                 EMULATOR_CONTAINER_NAME,
                 "-p",
                 EMULATOR_PORT_MAPPING,
+                "-v",
+                DOCKER_SOCKET_BINDING,
                 FLOCI_IMAGE,
             )
 

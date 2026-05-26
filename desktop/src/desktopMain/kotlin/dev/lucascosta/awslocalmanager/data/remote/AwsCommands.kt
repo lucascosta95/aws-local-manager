@@ -120,4 +120,51 @@ object AwsCommands {
             "--attribute-value",
             value,
         )
+
+    fun createElastiCacheCluster(
+        clusterId: String,
+        nodeType: String,
+        numNodes: String,
+    ): List<String> =
+        listOf(
+            "aws",
+            "elasticache",
+            "create-cache-cluster",
+            "--cache-cluster-id",
+            clusterId,
+            "--engine",
+            "memcached",
+            "--cache-node-type",
+            nodeType,
+            "--num-cache-nodes",
+            numNodes,
+            "--output",
+            "text",
+        )
+
+    fun createElastiCacheReplicationGroup(
+        groupId: String,
+        nodeType: String,
+    ): List<String> =
+        listOf(
+            "aws",
+            "elasticache",
+            "create-replication-group",
+            "--replication-group-id",
+            groupId,
+            "--replication-group-description",
+            groupId,
+            "--cache-node-type",
+            nodeType,
+            "--num-cache-clusters",
+            "1",
+            "--output",
+            "text",
+        )
+
+    fun deleteElastiCacheCluster(clusterId: String): List<String> =
+        listOf("aws", "elasticache", "delete-cache-cluster", "--cache-cluster-id", clusterId)
+
+    fun deleteElastiCacheReplicationGroup(groupId: String): List<String> =
+        listOf("aws", "elasticache", "delete-replication-group", "--replication-group-id", groupId)
 }

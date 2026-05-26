@@ -10,21 +10,14 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.TIME_FORMAT_PATTERN
 import dev.lucascosta.awslocalmanager.data.model.aws.AwsResourceDefinition
 import dev.lucascosta.awslocalmanager.data.model.aws.ResourceCreationResult
 import dev.lucascosta.awslocalmanager.data.model.process.ProcessConfig
-import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
-import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
-import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
-import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
+import dev.lucascosta.awslocalmanager.data.model.resources.*
 import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorDefaults
 import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
@@ -65,6 +58,10 @@ class QuickViewModel(
         _state.update { it.copy(partitionKeyType = type) }
     }
 
+    fun setElastiCacheEngine(engine: ElastiCacheEngine) {
+        _state.update { it.copy(elastiCacheEngine = engine) }
+    }
+
     fun create() {
         val currentState = _state.value
         if (currentState.resourceName.isBlank() || currentState.isCreating) return
@@ -100,6 +97,7 @@ class QuickViewModel(
             SnsResource -> listOf(ResourceCreationResult(state.resourceName, runCommand(AwsCommands.createSns(state.resourceName), env)))
             S3Resource -> listOf(ResourceCreationResult(state.resourceName, runCommand(AwsCommands.createS3(state.resourceName), env)))
             DynamoDbResource -> listOf(ResourceCreationResult(state.resourceName, createDynamoDB(state, env)))
+            ElastiCacheResource -> listOf(ResourceCreationResult(state.resourceName, createElastiCache(state, env)))
             else -> listOf(ResourceCreationResult(state.resourceName, false))
         }
 
@@ -131,6 +129,19 @@ class QuickViewModel(
             AwsCommands.createDynamoDb(state.resourceName, state.partitionKey, state.partitionKeyType.awsValue),
             env,
         )
+
+    private suspend fun createElastiCache(
+        state: QuickUiState,
+        env: Map<String, String>,
+    ): Boolean {
+        val command =
+            if (state.elastiCacheEngine == ElastiCacheEngine.REDIS) {
+                AwsCommands.createElastiCacheReplicationGroup(state.resourceName, "cache.t3.micro")
+            } else {
+                AwsCommands.createElastiCacheCluster(state.resourceName, "cache.t3.micro", "1")
+            }
+        return runCommand(command, env)
+    }
 
     private suspend fun runCommand(
         command: List<String>,

@@ -1,58 +1,20 @@
 package dev.lucascosta.awslocalmanager.features.inspector
 
-import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -488,6 +450,12 @@ private fun DetailPanel(
                                     }
                                 viewModel.navigateToPath(parent)
                             },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+
+                    is InspectorDetail.ElastiCacheDetail ->
+                        ElastiCacheDetailView(
+                            detail = detail,
                             modifier = Modifier.fillMaxSize(),
                         )
                 }
@@ -1121,6 +1089,7 @@ private fun localizedSummary(
         }
         "sfn" -> strings.inspectorSummarySfn
         "s3" -> strings.inspectorSummaryS3
+        "redis", "memcached" -> strings.inspectorSummaryElastiCache
         else -> ""
     }
 
@@ -1144,3 +1113,52 @@ private fun formatBytes(bytes: Long): String =
         bytes < 1024 * 1024 * 1024 -> "${"%.1f".format(bytes / (1024.0 * 1024))} MB"
         else -> "${"%.1f".format(bytes / (1024.0 * 1024 * 1024))} GB"
     }
+
+@Composable
+private fun ElastiCacheDetailView(
+    detail: InspectorDetail.ElastiCacheDetail,
+    modifier: Modifier = Modifier,
+) {
+    val strings = LocalInspectorStrings.current
+
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOfNotNull(
+            strings.inspectorElastiCacheEngine to detail.engine.ifBlank { null },
+            strings.inspectorElastiCacheStatus to detail.status.ifBlank { null },
+            strings.inspectorElastiCacheNodeType to detail.nodeType.ifBlank { null },
+            strings.inspectorElastiCacheNodes to detail.numNodes.takeIf { it > 0 }?.toString(),
+            strings.inspectorElastiCacheVersion to detail.engineVersion.ifBlank { null },
+            strings.inspectorElastiCacheEndpoint to detail.endpoint,
+            strings.inspectorElastiCachePort to detail.port?.toString(),
+        ).forEach { (label, value) ->
+            if (value != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.widthIn(min = 120.dp),
+                    )
+                    Text(value, style = MaterialTheme.typography.bodySmall)
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
+        }
+
+        if (detail.engine.isBlank() && detail.status.isBlank()) {
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    strings.inspectorElastiCacheEmpty,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}

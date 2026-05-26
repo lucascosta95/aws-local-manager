@@ -24,15 +24,7 @@ import dev.lucascosta.awslocalmanager.domain.TerraformReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -275,7 +267,7 @@ class InfrastructureViewModel(
     ) {
         val typeName = resource.resourceType?.id ?: resource.rawAwsType
         appendLog(ProcessLine(ctx.logStrings.creatingFmt.replace("{name}", resource.awsName).replace("{type}", typeName), false))
-        val command = resource.resourceType?.createCommand(resource.awsName)
+        val command = resource.resourceType?.createCommand(resource.awsName, resource.extraProperties)
         if (command == null) {
             appendLog(ProcessLine(ctx.logStrings.unsupportedFmt.replace("{type}", typeName), true))
             setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)

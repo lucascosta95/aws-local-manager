@@ -17,7 +17,10 @@ object SnsSubscriptionResource : AwsResourceDefinition {
     override val supportsPayloads = false
     override val successSnackbarKey = SuccessSnackbarKey.GENERIC
 
-    override fun createCommand(name: String): List<String>? = null
+    override fun createCommand(
+        name: String,
+        extraProperties: Map<String, String>,
+    ): List<String>? = null
 
     override fun deleteCommand(resource: RunningResource): List<String>? = null
 

@@ -16,7 +16,10 @@ interface AwsResourceDefinition {
     val supportsPayloads: Boolean
     val successSnackbarKey: SuccessSnackbarKey
 
-    fun createCommand(name: String): List<String>?
+    fun createCommand(
+        name: String,
+        extraProperties: Map<String, String> = emptyMap(),
+    ): List<String>?
 
     fun deleteCommand(resource: RunningResource): List<String>?
 

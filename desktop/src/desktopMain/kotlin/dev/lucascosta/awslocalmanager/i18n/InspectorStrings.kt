@@ -50,6 +50,15 @@ data class InspectorStrings(
     val inspectorSfnStatusFailed: String,
     val inspectorSfnStatusTimedOut: String,
     val inspectorSfnStatusAborted: String,
+    val inspectorElastiCacheEmpty: String,
+    val inspectorElastiCacheEngine: String,
+    val inspectorElastiCacheStatus: String,
+    val inspectorElastiCacheNodes: String,
+    val inspectorElastiCacheEndpoint: String,
+    val inspectorElastiCachePort: String,
+    val inspectorElastiCacheVersion: String,
+    val inspectorElastiCacheNodeType: String,
+    val inspectorSummaryElastiCache: String,
 )
 
 val InspectorStringsEnUs =
@@ -92,6 +101,15 @@ val InspectorStringsEnUs =
         inspectorSfnStatusFailed = "Failed",
         inspectorSfnStatusTimedOut = "Timed Out",
         inspectorSfnStatusAborted = "Aborted",
+        inspectorElastiCacheEmpty = "No clusters found",
+        inspectorElastiCacheEngine = "Engine",
+        inspectorElastiCacheStatus = "Status",
+        inspectorElastiCacheNodes = "Nodes",
+        inspectorElastiCacheEndpoint = "Endpoint",
+        inspectorElastiCachePort = "Port",
+        inspectorElastiCacheVersion = "Engine Version",
+        inspectorElastiCacheNodeType = "Node Type",
+        inspectorSummaryElastiCache = "View cluster",
     )
 
 val InspectorStringsPtBr =
@@ -134,4 +152,13 @@ val InspectorStringsPtBr =
         inspectorSfnStatusFailed = "Falhou",
         inspectorSfnStatusTimedOut = "Expirou",
         inspectorSfnStatusAborted = "Cancelado",
+        inspectorElastiCacheEmpty = "Nenhum cluster encontrado",
+        inspectorElastiCacheEngine = "Engine",
+        inspectorElastiCacheStatus = "Status",
+        inspectorElastiCacheNodes = "Nós",
+        inspectorElastiCacheEndpoint = "Endpoint",
+        inspectorElastiCachePort = "Porta",
+        inspectorElastiCacheVersion = "Versão do Engine",
+        inspectorElastiCacheNodeType = "Tipo de Nó",
+        inspectorSummaryElastiCache = "Ver cluster",
     )

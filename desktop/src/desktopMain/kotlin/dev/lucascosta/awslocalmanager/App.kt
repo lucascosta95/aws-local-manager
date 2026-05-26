@@ -5,15 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -27,12 +19,7 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.APP_NAME
 import dev.lucascosta.awslocalmanager.constants.AppConstants.WINDOW_HEIGHT_DP
 import dev.lucascosta.awslocalmanager.constants.AppConstants.WINDOW_WIDTH_DP
 import dev.lucascosta.awslocalmanager.data.model.aws.ResourceRegistry
-import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
-import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
-import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
-import dev.lucascosta.awslocalmanager.data.model.resources.SnsSubscriptionResource
-import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
-import dev.lucascosta.awslocalmanager.data.model.resources.StepFunctionsResource
+import dev.lucascosta.awslocalmanager.data.model.resources.*
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorClient
 import dev.lucascosta.awslocalmanager.data.repository.AppPreferences
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
@@ -40,11 +27,7 @@ import dev.lucascosta.awslocalmanager.di.appModules
 import dev.lucascosta.awslocalmanager.features.dashboard.DashboardViewModel
 import dev.lucascosta.awslocalmanager.features.infrastructure.InfrastructureViewModel
 import dev.lucascosta.awslocalmanager.features.inspector.InspectorViewModel
-import dev.lucascosta.awslocalmanager.features.inspector.handler.DynamoInspectorHandler
-import dev.lucascosta.awslocalmanager.features.inspector.handler.InspectorHandlerRegistry
-import dev.lucascosta.awslocalmanager.features.inspector.handler.S3InspectorHandler
-import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
-import dev.lucascosta.awslocalmanager.features.inspector.handler.StepFunctionsInspectorHandler
+import dev.lucascosta.awslocalmanager.features.inspector.handler.*
 import dev.lucascosta.awslocalmanager.features.project.ProjectSelectorViewModel
 import dev.lucascosta.awslocalmanager.features.quick.QuickViewModel
 import dev.lucascosta.awslocalmanager.features.running.RunningViewModel
@@ -72,12 +55,14 @@ fun main() {
         SqsResource,
         StepFunctionsResource,
         SnsSubscriptionResource,
+        ElastiCacheResource,
     )
 
     InspectorHandlerRegistry.register(SqsInspectorHandler())
     InspectorHandlerRegistry.register(StepFunctionsInspectorHandler())
     InspectorHandlerRegistry.register(DynamoInspectorHandler())
     InspectorHandlerRegistry.register(S3InspectorHandler())
+    InspectorHandlerRegistry.register(ElastiCacheInspectorHandler())
 
     application {
         val windowState = WindowState(size = DpSize(WINDOW_WIDTH_DP.dp, WINDOW_HEIGHT_DP.dp))
