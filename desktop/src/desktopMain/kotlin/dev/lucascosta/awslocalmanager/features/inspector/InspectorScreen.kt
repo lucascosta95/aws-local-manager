@@ -456,6 +456,9 @@ private fun DetailPanel(
                     is InspectorDetail.ElastiCacheDetail ->
                         ElastiCacheDetailView(
                             detail = detail,
+                            isLoadingMore = state.isLoadingSubDetail,
+                            onLoadMore = viewModel::loadMoreItems,
+                            onPrefixChange = viewModel::navigateToPath,
                             modifier = Modifier.fillMaxSize(),
                         )
                 }
@@ -1117,47 +1120,183 @@ private fun formatBytes(bytes: Long): String =
 @Composable
 private fun ElastiCacheDetailView(
     detail: InspectorDetail.ElastiCacheDetail,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit,
+    onPrefixChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val strings = LocalInspectorStrings.current
+    var prefixInput by remember(detail.clusterId) { mutableStateOf(detail.cachePrefix) }
 
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        listOfNotNull(
-            strings.inspectorElastiCacheEngine to detail.engine.ifBlank { null },
-            strings.inspectorElastiCacheStatus to detail.status.ifBlank { null },
-            strings.inspectorElastiCacheNodeType to detail.nodeType.ifBlank { null },
-            strings.inspectorElastiCacheNodes to detail.numNodes.takeIf { it > 0 }?.toString(),
-            strings.inspectorElastiCacheVersion to detail.engineVersion.ifBlank { null },
-            strings.inspectorElastiCacheEndpoint to detail.endpoint,
-            strings.inspectorElastiCachePort to detail.port?.toString(),
-        ).forEach { (label, value) ->
-            if (value != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.widthIn(min = 120.dp),
-                    )
-                    Text(value, style = MaterialTheme.typography.bodySmall)
+    LaunchedEffect(prefixInput) {
+        kotlinx.coroutines.delay(500)
+        if (prefixInput != detail.cachePrefix) {
+            onPrefixChange(prefixInput)
+        }
+    }
+
+    if (detail.engine.isBlank() && detail.status.isBlank()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text(
+                strings.inspectorElastiCacheEmpty,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    Column(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            listOfNotNull(
+                strings.inspectorElastiCacheEngine to detail.engine.ifBlank { null },
+                strings.inspectorElastiCacheStatus to detail.status.ifBlank { null },
+                strings.inspectorElastiCacheNodeType to detail.nodeType.ifBlank { null },
+                strings.inspectorElastiCacheNodes to detail.numNodes.takeIf { it > 0 }?.toString(),
+                strings.inspectorElastiCacheVersion to detail.engineVersion.ifBlank { null },
+                strings.inspectorElastiCacheEndpoint to detail.endpoint,
+                strings.inspectorElastiCachePort to detail.port?.toString(),
+            ).forEach { (label, value) ->
+                if (value != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.widthIn(min = 120.dp),
+                        )
+                        Text(value, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
 
-        if (detail.engine.isBlank() && detail.status.isBlank()) {
-            Box(modifier = Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) {
+        HorizontalDivider()
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                strings.inspectorElastiCacheKeys,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+                value = prefixInput,
+                onValueChange = { prefixInput = it },
+                placeholder = {
+                    Text(strings.inspectorElastiCachePrefixHint, style = MaterialTheme.typography.bodySmall)
+                },
+                singleLine = true,
+                modifier = Modifier.widthIn(max = 220.dp),
+                textStyle = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        HorizontalDivider()
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth().background(
+                    MaterialTheme.colorScheme.surfaceVariant,
+                ).padding(horizontal = 12.dp, vertical = 6.dp),
+        ) {
+            Text(
+                strings.inspectorElastiCacheKeyColumn,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.weight(0.4f),
+            )
+            Text(
+                strings.inspectorElastiCacheValueColumn,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.weight(0.45f),
+            )
+            Text(
+                strings.inspectorElastiCacheTtlColumn,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.weight(0.15f),
+            )
+        }
+
+        HorizontalDivider()
+
+        if (detail.cacheEntries.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text(
-                    strings.inspectorElastiCacheEmpty,
+                    strings.inspectorElastiCacheNoKeys,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        } else {
+            val vListState = rememberLazyListState()
+            Box(modifier = Modifier.weight(1f)) {
+                LazyColumn(state = vListState, modifier = Modifier.fillMaxSize().padding(end = 12.dp)) {
+                    items(detail.cacheEntries) { entry ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                entry.key,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                modifier = Modifier.weight(0.4f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                entry.value ?: "",
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                modifier = Modifier.weight(0.45f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                when (val ttl = entry.ttl) {
+                                    null -> strings.inspectorElastiCacheNoExpiry
+                                    -2L -> "-"
+                                    else -> "${ttl}s"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(0.15f),
+                                maxLines = 1,
+                            )
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
+                VerticalScrollbar(
+                    adapter = rememberScrollbarAdapter(vListState),
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
+                )
+            }
+        }
+
+        if (detail.hasMore) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                OutlinedButton(
+                    onClick = onLoadMore,
+                    enabled = !isLoadingMore,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                ) {
+                    if (isLoadingMore) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(strings.inspectorElastiCacheLoadMore, style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
     }

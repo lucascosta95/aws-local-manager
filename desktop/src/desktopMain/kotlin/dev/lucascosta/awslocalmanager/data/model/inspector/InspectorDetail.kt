@@ -56,5 +56,9 @@ sealed class InspectorDetail {
         val engineVersion: String,
         val endpoint: String?,
         val port: Int?,
+        val cacheEntries: List<CacheEntry> = emptyList(),
+        val hasMore: Boolean = false,
+        val cursor: String = "0",
+        val cachePrefix: String = "",
     ) : InspectorDetail()
 }

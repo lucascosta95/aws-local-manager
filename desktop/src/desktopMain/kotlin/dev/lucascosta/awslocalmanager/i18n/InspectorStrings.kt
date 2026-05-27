@@ -59,6 +59,14 @@ data class InspectorStrings(
     val inspectorElastiCacheVersion: String,
     val inspectorElastiCacheNodeType: String,
     val inspectorSummaryElastiCache: String,
+    val inspectorElastiCacheKeys: String,
+    val inspectorElastiCacheKeyColumn: String,
+    val inspectorElastiCacheValueColumn: String,
+    val inspectorElastiCacheTtlColumn: String,
+    val inspectorElastiCacheNoExpiry: String,
+    val inspectorElastiCachePrefixHint: String,
+    val inspectorElastiCacheLoadMore: String,
+    val inspectorElastiCacheNoKeys: String,
 )
 
 val InspectorStringsEnUs =
@@ -110,6 +118,14 @@ val InspectorStringsEnUs =
         inspectorElastiCacheVersion = "Engine Version",
         inspectorElastiCacheNodeType = "Node Type",
         inspectorSummaryElastiCache = "View cluster",
+        inspectorElastiCacheKeys = "Cache Keys",
+        inspectorElastiCacheKeyColumn = "Key",
+        inspectorElastiCacheValueColumn = "Value",
+        inspectorElastiCacheTtlColumn = "TTL",
+        inspectorElastiCacheNoExpiry = "No expiry",
+        inspectorElastiCachePrefixHint = "Filter by prefix...",
+        inspectorElastiCacheLoadMore = "Load more",
+        inspectorElastiCacheNoKeys = "No keys found",
     )
 
 val InspectorStringsPtBr =
@@ -161,4 +177,12 @@ val InspectorStringsPtBr =
         inspectorElastiCacheVersion = "Versão do Engine",
         inspectorElastiCacheNodeType = "Tipo de Nó",
         inspectorSummaryElastiCache = "Ver cluster",
+        inspectorElastiCacheKeys = "Chaves do Cache",
+        inspectorElastiCacheKeyColumn = "Chave",
+        inspectorElastiCacheValueColumn = "Valor",
+        inspectorElastiCacheTtlColumn = "TTL",
+        inspectorElastiCacheNoExpiry = "Sem expiração",
+        inspectorElastiCachePrefixHint = "Filtrar por prefixo...",
+        inspectorElastiCacheLoadMore = "Carregar mais",
+        inspectorElastiCacheNoKeys = "Nenhuma chave encontrada",
     )
