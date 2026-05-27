@@ -59,6 +59,5 @@ sealed class InspectorDetail {
         val cacheEntries: List<CacheEntry> = emptyList(),
         val hasMore: Boolean = false,
         val cursor: String = "0",
-        val cachePrefix: String = "",
     ) : InspectorDetail()
 }

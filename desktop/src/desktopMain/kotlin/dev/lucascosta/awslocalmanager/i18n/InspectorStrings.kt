@@ -64,7 +64,6 @@ data class InspectorStrings(
     val inspectorElastiCacheValueColumn: String,
     val inspectorElastiCacheTtlColumn: String,
     val inspectorElastiCacheNoExpiry: String,
-    val inspectorElastiCachePrefixHint: String,
     val inspectorElastiCacheLoadMore: String,
     val inspectorElastiCacheNoKeys: String,
 )
@@ -123,7 +122,6 @@ val InspectorStringsEnUs =
         inspectorElastiCacheValueColumn = "Value",
         inspectorElastiCacheTtlColumn = "TTL",
         inspectorElastiCacheNoExpiry = "No expiry",
-        inspectorElastiCachePrefixHint = "Filter by prefix...",
         inspectorElastiCacheLoadMore = "Load more",
         inspectorElastiCacheNoKeys = "No keys found",
     )
@@ -182,7 +180,6 @@ val InspectorStringsPtBr =
         inspectorElastiCacheValueColumn = "Valor",
         inspectorElastiCacheTtlColumn = "TTL",
         inspectorElastiCacheNoExpiry = "Sem expiração",
-        inspectorElastiCachePrefixHint = "Filtrar por prefixo...",
         inspectorElastiCacheLoadMore = "Carregar mais",
         inspectorElastiCacheNoKeys = "Nenhuma chave encontrada",
     )

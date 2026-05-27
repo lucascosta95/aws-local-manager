@@ -47,7 +47,6 @@ class ElastiCacheInspectorHandler : InspectorServiceHandler {
                     port = null,
                 )
 
-        val prefix = resource.currentPath
         val rawHost = info.endpointAddress
         val port = info.endpointPort
         val resolvedHost =
@@ -58,7 +57,7 @@ class ElastiCacheInspectorHandler : InspectorServiceHandler {
             }
         val (entries, cursor, hasMore) =
             if (resolvedHost != null && port != null && port > 0) {
-                loadCacheContent(info.engine, resolvedHost, port, cursor = "0", prefix = prefix)
+                loadCacheContent(info.engine, resolvedHost, port, cursor = "0", prefix = "")
             } else {
                 Triple(emptyList<CacheEntry>(), "0", false)
             }
@@ -75,7 +74,6 @@ class ElastiCacheInspectorHandler : InspectorServiceHandler {
             cacheEntries = entries,
             hasMore = hasMore,
             cursor = cursor,
-            cachePrefix = prefix,
         )
     }
 
@@ -90,7 +88,7 @@ class ElastiCacheInspectorHandler : InspectorServiceHandler {
         val port = detail.port ?: return null
 
         val (newEntries, newCursor, newHasMore) =
-            loadCacheContent(detail.engine, host, port, cursor = detail.cursor, prefix = detail.cachePrefix)
+            loadCacheContent(detail.engine, host, port, cursor = detail.cursor, prefix = "")
 
         return detail.copy(
             cacheEntries = detail.cacheEntries + newEntries,

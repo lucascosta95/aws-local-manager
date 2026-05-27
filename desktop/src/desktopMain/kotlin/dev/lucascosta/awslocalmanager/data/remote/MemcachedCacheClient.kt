@@ -120,7 +120,7 @@ class MemcachedCacheClient(private val host: String, private val port: Int) {
                 }
 
                 currentKey != null -> {
-                    if (valueBuilder.isNotEmpty()){
+                    if (valueBuilder.isNotEmpty()) {
                         valueBuilder.append('\n')
                     }
                     valueBuilder.append(line)

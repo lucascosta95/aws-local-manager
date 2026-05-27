@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.lucascosta.awslocalmanager.components.ResizableTable
+import dev.lucascosta.awslocalmanager.components.TableColumn
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorDetail
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorResource
 import dev.lucascosta.awslocalmanager.data.model.inspector.SfnInspectorExecution
@@ -458,7 +460,6 @@ private fun DetailPanel(
                             detail = detail,
                             isLoadingMore = state.isLoadingSubDetail,
                             onLoadMore = viewModel::loadMoreItems,
-                            onPrefixChange = viewModel::navigateToPath,
                             modifier = Modifier.fillMaxSize(),
                         )
                 }
@@ -801,26 +802,21 @@ private fun DynamoDetailView(
                 )
             }
         } else {
-            val hScrollState = rememberScrollState()
             val vListState = rememberLazyListState()
+            val tableColumns = buildDynamoColumns(detail.columns)
+            val tableRows = detail.items.map { item -> detail.columns.map { col -> item[col] ?: "" } }
 
             Box(modifier = Modifier.weight(1f)) {
-                Column(modifier = Modifier.fillMaxSize().horizontalScroll(hScrollState)) {
-                    DynamoTableHeader(columns = detail.columns)
-                    HorizontalDivider()
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        LazyColumn(state = vListState, modifier = Modifier.fillMaxSize().padding(end = 12.dp)) {
-                            items(detail.items) { item ->
-                                DynamoTableRow(item = item, columns = detail.columns)
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            }
-                        }
-                        VerticalScrollbar(
-                            adapter = rememberScrollbarAdapter(vListState),
-                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
-                        )
-                    }
-                }
+                ResizableTable(
+                    columns = tableColumns,
+                    rows = tableRows,
+                    listState = vListState,
+                    modifier = Modifier.fillMaxSize().padding(end = 12.dp),
+                )
+                VerticalScrollbar(
+                    adapter = rememberScrollbarAdapter(vListState),
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
+                )
             }
 
             if (detail.hasMore) {
@@ -845,37 +841,13 @@ private fun DynamoDetailView(
     }
 }
 
-@Composable
-private fun DynamoTableHeader(columns: List<String>) {
-    Row(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
-        columns.forEach { col ->
-            Text(
-                col,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.widthIn(min = 120.dp, max = 240.dp).padding(horizontal = 12.dp, vertical = 6.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+private fun buildDynamoColumns(headers: List<String>): List<TableColumn> {
+    if (headers.isEmpty()) {
+        return emptyList()
     }
-}
 
-@Composable
-private fun DynamoTableRow(
-    item: Map<String, String>,
-    columns: List<String>,
-) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        columns.forEach { col ->
-            Text(
-                item[col] ?: "",
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                modifier = Modifier.widthIn(min = 120.dp, max = 240.dp).padding(horizontal = 12.dp, vertical = 6.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    val fraction = 1f / headers.size
+    return headers.map { TableColumn(header = it, initialWidthFraction = fraction) }
 }
 
 @Composable
@@ -1122,18 +1094,9 @@ private fun ElastiCacheDetailView(
     detail: InspectorDetail.ElastiCacheDetail,
     isLoadingMore: Boolean,
     onLoadMore: () -> Unit,
-    onPrefixChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val strings = LocalInspectorStrings.current
-    var prefixInput by remember(detail.clusterId) { mutableStateOf(detail.cachePrefix) }
-
-    LaunchedEffect(prefixInput) {
-        kotlinx.coroutines.delay(500)
-        if (prefixInput != detail.cachePrefix) {
-            onPrefixChange(prefixInput)
-        }
-    }
 
     if (detail.engine.isBlank() && detail.status.isBlank()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -1180,52 +1143,11 @@ private fun ElastiCacheDetailView(
 
         HorizontalDivider()
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                strings.inspectorElastiCacheKeys,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedTextField(
-                value = prefixInput,
-                onValueChange = { prefixInput = it },
-                placeholder = {
-                    Text(strings.inspectorElastiCachePrefixHint, style = MaterialTheme.typography.bodySmall)
-                },
-                singleLine = true,
-                modifier = Modifier.widthIn(max = 220.dp),
-                textStyle = MaterialTheme.typography.bodySmall,
-            )
-        }
-
-        HorizontalDivider()
-
-        Row(
-            modifier =
-                Modifier.fillMaxWidth().background(
-                    MaterialTheme.colorScheme.surfaceVariant,
-                ).padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Text(
-                strings.inspectorElastiCacheKeyColumn,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.weight(0.4f),
-            )
-            Text(
-                strings.inspectorElastiCacheValueColumn,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.weight(0.45f),
-            )
-            Text(
-                strings.inspectorElastiCacheTtlColumn,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.weight(0.15f),
-            )
-        }
+        Text(
+            strings.inspectorElastiCacheKeys,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
 
         HorizontalDivider()
 
@@ -1239,41 +1161,32 @@ private fun ElastiCacheDetailView(
             }
         } else {
             val vListState = rememberLazyListState()
-            Box(modifier = Modifier.weight(1f)) {
-                LazyColumn(state = vListState, modifier = Modifier.fillMaxSize().padding(end = 12.dp)) {
-                    items(detail.cacheEntries) { entry ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                entry.key,
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                modifier = Modifier.weight(0.4f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                entry.value ?: "",
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                modifier = Modifier.weight(0.45f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                when (val ttl = entry.ttl) {
-                                    null -> strings.inspectorElastiCacheNoExpiry
-                                    -2L -> "-"
-                                    else -> "${ttl}s"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.weight(0.15f),
-                                maxLines = 1,
-                            )
-                        }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    }
+            val tableColumns =
+                listOf(
+                    TableColumn(strings.inspectorElastiCacheKeyColumn, 0.40f),
+                    TableColumn(strings.inspectorElastiCacheValueColumn, 0.45f),
+                    TableColumn(strings.inspectorElastiCacheTtlColumn, 0.15f),
+                )
+            val tableRows =
+                detail.cacheEntries.map { entry ->
+                    listOf(
+                        entry.key,
+                        entry.value ?: "",
+                        when (val ttl = entry.ttl) {
+                            null -> strings.inspectorElastiCacheNoExpiry
+                            -2L -> "-"
+                            else -> "${ttl}s"
+                        },
+                    )
                 }
+
+            Box(modifier = Modifier.weight(1f)) {
+                ResizableTable(
+                    columns = tableColumns,
+                    rows = tableRows,
+                    listState = vListState,
+                    modifier = Modifier.fillMaxSize().padding(end = 12.dp),
+                )
                 VerticalScrollbar(
                     adapter = rememberScrollbarAdapter(vListState),
                     modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
