@@ -2,38 +2,35 @@
 
 package dev.lucascosta.awslocalmanager.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import java.awt.Cursor
 
-private val HANDLE_WIDTH = 4.dp
+private val HANDLE_WIDTH = 6.dp
 private val MIN_COL_WIDTH = 60.dp
 private const val TOOLTIP_DELAY_MS = 400
 
@@ -48,82 +45,115 @@ fun ResizableTable(
     columns: List<TableColumn>,
     rows: List<List<String>>,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState(),
 ) {
     val density = LocalDensity.current
-    val colWidths =
-        remember(columns) {
-            mutableStateListOf(*Array(columns.size) { 0.dp })
-        }
-    val tableWidthState = remember { androidx.compose.runtime.mutableStateOf(0) }
+    val columnWidths = remember(columns) { mutableStateListOf(*Array(columns.size) { -1f }) }
+    val scrollState = rememberScrollState()
 
-    Box(
-        modifier =
-            modifier.onSizeChanged { size ->
-                val totalPx = size.width
-                if (totalPx > 0 && tableWidthState.value != totalPx) {
-                    tableWidthState.value = totalPx
-                    val totalDp = with(density) { totalPx.toDp() }
-                    val handleSpace = HANDLE_WIDTH * (columns.size - 1)
-                    val usable = totalDp - handleSpace
-                    columns.forEachIndexed { i, col ->
-                        colWidths[i] = maxOf(col.minWidthDp, usable * col.initialWidthFraction)
-                    }
-                }
-            },
-    ) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            stickyHeader {
-                TableHeaderRow(columns = columns, colWidths = colWidths)
+    BoxWithConstraints(modifier = modifier) {
+        val totalWidthPx = with(density) { maxWidth.toPx() }
+
+        if (columnWidths.all { it < 0f } && totalWidthPx > 0f) {
+            columns.forEachIndexed { i, col ->
+                columnWidths[i] = totalWidthPx * col.initialWidthFraction
             }
-            itemsIndexed(rows) { rowIndex, row ->
-                TableDataRow(
-                    row = row,
+        }
+
+        if (columnWidths.all { it >= 0f }) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                TableHeaderRow(
                     columns = columns,
-                    colWidths = colWidths,
-                    isOdd = rowIndex % 2 != 0,
+                    columnWidths = columnWidths,
+                    onResize = { index, delta ->
+                        resizeColumns(columnWidths, index, delta, columns, density)
+                    },
                 )
+                HorizontalDivider()
+                Box(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(end = 12.dp).verticalScroll(scrollState),
+                    ) {
+                        rows.forEachIndexed { rowIndex, row ->
+                            TableDataRow(
+                                values = row,
+                                columnWidths = columnWidths,
+                                isOdd = rowIndex % 2 != 0,
+                            )
+                            HorizontalDivider(
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                            )
+                        }
+                    }
+                    VerticalScrollbar(
+                        adapter = rememberScrollbarAdapter(scrollState),
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
+                    )
+                }
             }
         }
     }
 }
 
+private fun resizeColumns(
+    columnWidths: MutableList<Float>,
+    index: Int,
+    delta: Float,
+    columns: List<TableColumn>,
+    density: Density,
+) {
+    val rightIndex = index + 1
+    if (rightIndex >= columnWidths.size) return
+
+    val minLeft = with(density) { columns[index].minWidthDp.toPx() }
+    val minRight = with(density) { columns[rightIndex].minWidthDp.toPx() }
+
+    val maxDelta = columnWidths[rightIndex] - minRight
+    val minDelta = -(columnWidths[index] - minLeft)
+    val clampedDelta = delta.coerceIn(minDelta, maxDelta)
+
+    columnWidths[index] += clampedDelta
+    columnWidths[rightIndex] -= clampedDelta
+}
+
 @Composable
 private fun TableHeaderRow(
     columns: List<TableColumn>,
-    colWidths: MutableList<Dp>,
+    columnWidths: List<Float>,
+    onResize: (index: Int, delta: Float) -> Unit,
 ) {
     val density = LocalDensity.current
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        columns.forEachIndexed { i, col ->
-            val width = colWidths.getOrElse(i) { 0.dp }
-            if (width > 0.dp) {
+        columns.forEachIndexed { index, column ->
+            val widthPx = columnWidths.getOrElse(index) { 100f }
+            val widthDp = with(density) { widthPx.toDp() }.coerceAtLeast(1.dp)
+
+            Box(
+                modifier =
+                    Modifier
+                        .width(widthDp)
+                        .fillMaxHeight()
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
                 Text(
-                    col.header,
+                    text = column.header,
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.width(width).padding(horizontal = 10.dp, vertical = 6.dp),
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (i < columns.lastIndex) {
-                ResizeHandle(
-                    onDrag = { delta ->
-                        val deltaDp = with(density) { delta.toDp() }
-                        val newLeft = maxOf(col.minWidthDp, colWidths[i] + deltaDp)
-                        val nextCol = columns[i + 1]
-                        val spill = newLeft - colWidths[i]
-                        val newRight = maxOf(nextCol.minWidthDp, colWidths[i + 1] - spill)
-                        colWidths[i] = newLeft
-                        colWidths[i + 1] = newRight
-                    },
-                )
+
+            if (index < columns.size - 1) {
+                ResizeHandle(onDrag = { delta -> onResize(index, delta) })
             }
         }
     }
@@ -131,64 +161,68 @@ private fun TableHeaderRow(
 
 @Composable
 private fun TableDataRow(
-    row: List<String>,
-    columns: List<TableColumn>,
-    colWidths: MutableList<Dp>,
+    values: List<String>,
+    columnWidths: List<Float>,
     isOdd: Boolean,
 ) {
-    val hoverSource = remember { MutableInteractionSource() }
-    val isHovered by hoverSource.collectIsHoveredAsState()
+    val density = LocalDensity.current
+    var isHovered by remember { mutableStateOf(false) }
 
-    val rowBackground =
-        when {
-            isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            isOdd -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-            else -> MaterialTheme.colorScheme.surface
-        }
+    val background by animateColorAsState(
+        targetValue =
+            when {
+                isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                isOdd -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                else -> MaterialTheme.colorScheme.surface
+            },
+        animationSpec = tween(100),
+    )
 
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(rowBackground)
-                .hoverable(hoverSource),
+                .background(background)
+                .onHover { isHovered = it }
+                .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        columns.forEachIndexed { i, col ->
-            val width = colWidths.getOrElse(i) { 0.dp }
-            if (width > 0.dp) {
-                val cellValue = row.getOrElse(i) { "" }
-                TooltipArea(
-                    tooltip = {
-                        if (cellValue.isNotBlank()) {
-                            Surface(
-                                shape = MaterialTheme.shapes.small,
-                                tonalElevation = 4.dp,
-                                shadowElevation = 4.dp,
-                            ) {
-                                Text(
-                                    cellValue,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                )
-                            }
+        values.forEachIndexed { index, value ->
+            val widthPx = columnWidths.getOrElse(index) { 100f }
+            val widthDp = with(density) { widthPx.toDp() }.coerceAtLeast(1.dp)
+
+            TooltipArea(
+                tooltip = {
+                    if (value.isNotBlank()) {
+                        Surface(
+                            modifier = Modifier.widthIn(max = 480.dp),
+                            shape = RoundedCornerShape(6.dp),
+                            tonalElevation = 4.dp,
+                            shadowElevation = 4.dp,
+                        ) {
+                            Text(
+                                text = value,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            )
                         }
-                    },
-                    delayMillis = TOOLTIP_DELAY_MS,
-                    tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
-                    modifier = Modifier.width(width),
-                ) {
-                    Text(
-                        cellValue,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                    }
+                },
+                delayMillis = TOOLTIP_DELAY_MS,
+                tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
+                modifier = Modifier.width(widthDp),
+            ) {
+                Text(
+                    text = value,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            if (i < columns.lastIndex) {
-                Box(modifier = Modifier.width(HANDLE_WIDTH).fillMaxHeight())
+
+            if (index < values.size - 1) {
+                Spacer(modifier = Modifier.width(HANDLE_WIDTH).fillMaxHeight())
             }
         }
     }
@@ -196,30 +230,51 @@ private fun TableDataRow(
 
 @Composable
 private fun ResizeHandle(onDrag: (Float) -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
-    val isDragging = remember { androidx.compose.runtime.mutableStateOf(false) }
+    var isHovered by remember { mutableStateOf(false) }
+    var isDragging by remember { mutableStateOf(false) }
 
-    val handleColor =
-        when {
-            isDragging.value -> MaterialTheme.colorScheme.primary
-            isHovered -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0f)
-        }
+    val color by animateColorAsState(
+        targetValue =
+            when {
+                isDragging -> MaterialTheme.colorScheme.primary
+                isHovered -> MaterialTheme.colorScheme.outlineVariant
+                else -> Color.Transparent
+            },
+        animationSpec = tween(150),
+    )
 
     Box(
         modifier =
             Modifier
                 .width(HANDLE_WIDTH)
                 .fillMaxHeight()
-                .background(handleColor)
-                .hoverable(interactionSource)
+                .background(color)
                 .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta -> onDrag(delta) },
-                    onDragStarted = { isDragging.value = true },
-                    onDragStopped = { isDragging.value = false },
-                ),
+                .onHover { isHovered = it }
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { isDragging = true },
+                        onDragEnd = { isDragging = false },
+                        onDragCancel = { isDragging = false },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            onDrag(dragAmount.x)
+                        },
+                    )
+                },
     )
 }
+
+private fun Modifier.onHover(onHover: (Boolean) -> Unit): Modifier =
+    this.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                when (event.type) {
+                    PointerEventType.Enter -> onHover(true)
+                    PointerEventType.Exit -> onHover(false)
+                    else -> {}
+                }
+            }
+        }
+    }

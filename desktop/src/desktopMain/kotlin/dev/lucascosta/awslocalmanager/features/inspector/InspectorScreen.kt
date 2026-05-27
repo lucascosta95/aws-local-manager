@@ -802,22 +802,14 @@ private fun DynamoDetailView(
                 )
             }
         } else {
-            val vListState = rememberLazyListState()
             val tableColumns = buildDynamoColumns(detail.columns)
             val tableRows = detail.items.map { item -> detail.columns.map { col -> item[col] ?: "" } }
 
-            Box(modifier = Modifier.weight(1f)) {
-                ResizableTable(
-                    columns = tableColumns,
-                    rows = tableRows,
-                    listState = vListState,
-                    modifier = Modifier.fillMaxSize().padding(end = 12.dp),
-                )
-                VerticalScrollbar(
-                    adapter = rememberScrollbarAdapter(vListState),
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
-                )
-            }
+            ResizableTable(
+                columns = tableColumns,
+                rows = tableRows,
+                modifier = Modifier.weight(1f),
+            )
 
             if (detail.hasMore) {
                 Row(
@@ -1160,7 +1152,6 @@ private fun ElastiCacheDetailView(
                 )
             }
         } else {
-            val vListState = rememberLazyListState()
             val tableColumns =
                 listOf(
                     TableColumn(strings.inspectorElastiCacheKeyColumn, 0.40f),
@@ -1180,18 +1171,11 @@ private fun ElastiCacheDetailView(
                     )
                 }
 
-            Box(modifier = Modifier.weight(1f)) {
-                ResizableTable(
-                    columns = tableColumns,
-                    rows = tableRows,
-                    listState = vListState,
-                    modifier = Modifier.fillMaxSize().padding(end = 12.dp),
-                )
-                VerticalScrollbar(
-                    adapter = rememberScrollbarAdapter(vListState),
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
-                )
-            }
+            ResizableTable(
+                columns = tableColumns,
+                rows = tableRows,
+                modifier = Modifier.weight(1f),
+            )
         }
 
         if (detail.hasMore) {
