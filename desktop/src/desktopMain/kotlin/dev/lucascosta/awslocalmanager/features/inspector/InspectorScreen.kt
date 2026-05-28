@@ -605,12 +605,13 @@ private fun SqsMessageItem(message: SqsInspectorMessage) {
         }
 
         Text(
-            text = if (expanded) {
-                message.body
-            } else {
-                message.body.take(120)
-                    .let { if (message.body.length > 120) "$it…" else it }
-            },
+            text =
+                if (expanded) {
+                    message.body
+                } else {
+                    message.body.take(120)
+                        .let { if (message.body.length > 120) "$it…" else it }
+                },
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -623,7 +624,7 @@ private fun SqsMessageItem(message: SqsInspectorMessage) {
                     Text(
                         v,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -953,7 +954,7 @@ private fun S3Breadcrumb(
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (prefix.isNotBlank()) {
             IconButton(onClick = onNavigateUp, modifier = Modifier.size(24.dp)) {
@@ -972,7 +973,7 @@ private fun S3Breadcrumb(
                 Icons.Outlined.ChevronRight,
                 null,
                 modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             val partPrefix = parts.take(index + 1).joinToString("/") + "/"
             val isLast = index == parts.lastIndex

@@ -7,10 +7,7 @@ import dev.lucascosta.awslocalmanager.data.model.inspector.CacheEntry
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorDetail
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorResource
 import dev.lucascosta.awslocalmanager.data.model.process.ProcessConfig
-import dev.lucascosta.awslocalmanager.data.remote.AwsElastiCacheClient
-import dev.lucascosta.awslocalmanager.data.remote.MemcachedCacheClient
-import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
-import dev.lucascosta.awslocalmanager.data.remote.RedisCacheClient
+import dev.lucascosta.awslocalmanager.data.remote.*
 
 private const val REDIS_PAGE_SIZE = 100L
 
@@ -19,23 +16,27 @@ class ElastiCacheInspectorHandler : InspectorServiceHandler {
     override val displayName: String = "ElastiCache"
     override val icon: ImageVector = Icons.Outlined.Storage
 
-    override suspend fun loadResources(endpoint: String): List<InspectorResource> =
-        AwsElastiCacheClient(endpoint).listAllClusters().getOrElse { return emptyList() }
-            .map { info ->
-                InspectorResource(
-                    id = info.clusterId,
-                    name = info.clusterId,
-                    summaryType = info.engine,
-                )
-            }
+    private var lastKnownClusters: List<ElastiCacheClusterInfo> = emptyList()
+    private var activeRedisClient: RedisCacheClient? = null
+
+    override suspend fun loadResources(endpoint: String): List<InspectorResource> {
+        val clusters = AwsElastiCacheClient(endpoint).listAllClusters().getOrElse { return emptyList() }
+        lastKnownClusters = clusters
+        return clusters.map { info ->
+            InspectorResource(
+                id = info.clusterId,
+                name = info.clusterId,
+                summaryType = info.engine,
+            )
+        }
+    }
 
     override suspend fun loadDetail(
         endpoint: String,
         resource: InspectorResource,
     ): InspectorDetail {
-        val clusters = AwsElastiCacheClient(endpoint).listAllClusters().getOrElse { emptyList() }
         val info =
-            clusters.firstOrNull { it.clusterId == resource.id }
+            lastKnownClusters.firstOrNull { it.clusterId == resource.id }
                 ?: return InspectorDetail.ElastiCacheDetail(
                     clusterId = resource.id,
                     engine = "",
@@ -55,6 +56,10 @@ class ElastiCacheInspectorHandler : InspectorServiceHandler {
             } else {
                 rawHost
             }
+
+        activeRedisClient?.close()
+        activeRedisClient = null
+
         val (entries, cursor, hasMore) =
             if (resolvedHost != null && port != null && port > 0) {
                 loadCacheContent(info.engine, resolvedHost, port, cursor = "0", prefix = "")
@@ -127,8 +132,9 @@ class ElastiCacheInspectorHandler : InspectorServiceHandler {
     ): Triple<List<CacheEntry>, String, Boolean> =
         when (engine) {
             "redis" -> {
+                val client = activeRedisClient ?: RedisCacheClient(host, port).also { activeRedisClient = it }
                 val page =
-                    RedisCacheClient(host, port)
+                    client
                         .scanPage(cursor = cursor, pattern = prefix, pageSize = REDIS_PAGE_SIZE)
                         .getOrElse { return Triple(emptyList(), "0", false) }
                 Triple(page.entries, page.nextCursor, page.hasMore)
