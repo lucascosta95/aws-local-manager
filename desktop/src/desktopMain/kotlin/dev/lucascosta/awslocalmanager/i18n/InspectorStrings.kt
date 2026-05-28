@@ -66,6 +66,12 @@ data class InspectorStrings(
     val inspectorElastiCacheNoExpiry: String,
     val inspectorElastiCacheLoadMore: String,
     val inspectorElastiCacheNoKeys: String,
+    val inspectorSfnColumnExecution: String,
+    val inspectorSfnColumnStatus: String,
+    val inspectorSfnColumnStart: String,
+    val inspectorS3ColumnName: String,
+    val inspectorS3ColumnSize: String,
+    val inspectorS3ColumnDate: String,
 )
 
 val InspectorStringsEnUs =
@@ -124,6 +130,12 @@ val InspectorStringsEnUs =
         inspectorElastiCacheNoExpiry = "No expiry",
         inspectorElastiCacheLoadMore = "Load more",
         inspectorElastiCacheNoKeys = "No keys found",
+        inspectorSfnColumnExecution = "Execution",
+        inspectorSfnColumnStatus = "Status",
+        inspectorSfnColumnStart = "Start",
+        inspectorS3ColumnName = "Name",
+        inspectorS3ColumnSize = "Size",
+        inspectorS3ColumnDate = "Last Modified",
     )
 
 val InspectorStringsPtBr =
@@ -182,4 +194,10 @@ val InspectorStringsPtBr =
         inspectorElastiCacheNoExpiry = "Sem expiração",
         inspectorElastiCacheLoadMore = "Carregar mais",
         inspectorElastiCacheNoKeys = "Nenhuma chave encontrada",
+        inspectorSfnColumnExecution = "Execução",
+        inspectorSfnColumnStatus = "Status",
+        inspectorSfnColumnStart = "Início",
+        inspectorS3ColumnName = "Nome",
+        inspectorS3ColumnSize = "Tamanho",
+        inspectorS3ColumnDate = "Data",
     )

@@ -6,6 +6,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -23,6 +24,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -45,9 +47,12 @@ fun ResizableTable(
     columns: List<TableColumn>,
     rows: List<List<String>>,
     modifier: Modifier = Modifier,
+    onRowClick: ((Int) -> Unit)? = null,
+    selectedRowIndex: Int? = null,
+    emptyMessage: String? = null,
 ) {
     val density = LocalDensity.current
-    val columnWidths = remember(columns) { mutableStateListOf(*Array(columns.size) { -1f }) }
+    val columnWidths = remember(columns) { List(columns.size) { -1f }.toMutableStateList() }
     val scrollState = rememberScrollState()
 
     BoxWithConstraints(modifier = modifier) {
@@ -70,25 +75,39 @@ fun ResizableTable(
                 )
                 HorizontalDivider()
                 Box(modifier = Modifier.weight(1f)) {
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(end = 12.dp).verticalScroll(scrollState),
-                    ) {
-                        rows.forEachIndexed { rowIndex, row ->
-                            TableDataRow(
-                                values = row,
-                                columnWidths = columnWidths,
-                                isOdd = rowIndex % 2 != 0,
-                            )
-                            HorizontalDivider(
-                                thickness = 0.5.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                    if (rows.isEmpty() && emptyMessage != null) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = emptyMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(16.dp),
                             )
                         }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(end = 12.dp).verticalScroll(scrollState),
+                        ) {
+                            rows.forEachIndexed { rowIndex, row ->
+                                TableDataRow(
+                                    values = row,
+                                    columnWidths = columnWidths,
+                                    isOdd = rowIndex % 2 != 0,
+                                    isSelected = selectedRowIndex == rowIndex,
+                                    onClick = onRowClick?.let { cb -> { cb(rowIndex) } },
+                                )
+                                HorizontalDivider(
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                )
+                            }
+                        }
+                        VerticalScrollbar(
+                            adapter = rememberScrollbarAdapter(scrollState),
+                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
+                        )
                     }
-                    VerticalScrollbar(
-                        adapter = rememberScrollbarAdapter(scrollState),
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
-                    )
                 }
             }
         }
@@ -164,6 +183,8 @@ private fun TableDataRow(
     values: List<String>,
     columnWidths: List<Float>,
     isOdd: Boolean,
+    isSelected: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     var isHovered by remember { mutableStateOf(false) }
@@ -171,6 +192,7 @@ private fun TableDataRow(
     val background by animateColorAsState(
         targetValue =
             when {
+                isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
                 isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                 isOdd -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                 else -> MaterialTheme.colorScheme.surface
@@ -178,11 +200,23 @@ private fun TableDataRow(
         animationSpec = tween(100),
     )
 
+    val clickModifier =
+        if (onClick != null) {
+            Modifier.clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+        } else {
+            Modifier
+        }
+
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .background(background)
+                .then(clickModifier)
                 .onHover { isHovered = it }
                 .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,

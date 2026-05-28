@@ -35,6 +35,7 @@ class MemcachedCacheClient(private val host: String, private val port: Int) {
             }
         }
 
+    @Suppress("LoopWithTooManyJumpStatements")
     private fun fetchSlabIds(
         writer: PrintWriter,
         reader: BufferedReader,
@@ -62,38 +63,50 @@ class MemcachedCacheClient(private val host: String, private val port: Int) {
         val now = System.currentTimeMillis() / 1000L
         val result = mutableListOf<Pair<String, Long?>>()
         for (slab in slabIds) {
-            if (result.size >= limit) {
-                break
-            }
-
-            writer.print("stats cachedump $slab $limit\r\n")
-            writer.flush()
-
-            while (true) {
-                val line = reader.readLine() ?: break
-                if (line == "END") break
-                val match = Regex("ITEM (\\S+) \\[\\d+ b; (\\d+) s\\]").find(line)
-                if (match != null) {
-                    val key = match.groupValues[1]
-                    val expiry = match.groupValues[2].toLongOrNull() ?: 0L
-                    val ttl =
-                        when {
-                            expiry == 0L -> null
-                            expiry > now -> expiry - now
-                            else -> 0L
-                        }
-
-                    result.add(key to ttl)
-
-                    if (result.size >= limit) {
-                        break
-                    }
-                }
-            }
+            if (result.size >= limit) break
+            parseSlabDump(writer, reader, slab, limit, now, result)
         }
         return result
     }
 
+    @Suppress("LongParameterList", "LoopWithTooManyJumpStatements")
+    private fun parseSlabDump(
+        writer: PrintWriter,
+        reader: BufferedReader,
+        slab: Int,
+        limit: Int,
+        now: Long,
+        result: MutableList<Pair<String, Long?>>,
+    ) {
+        writer.print("stats cachedump $slab $limit\r\n")
+        writer.flush()
+
+        while (true) {
+            val line = reader.readLine() ?: break
+            if (line == "END") {
+                break
+            }
+
+            val match = Regex("ITEM (\\S+) \\[\\d+ b; (\\d+) s\\]").find(line)
+            if (match != null) {
+                val key = match.groupValues[1]
+                val expiry = match.groupValues[2].toLongOrNull() ?: 0L
+                val ttl =
+                    when {
+                        expiry == 0L -> null
+                        expiry > now -> expiry - now
+                        else -> 0L
+                    }
+
+                result.add(key to ttl)
+                if (result.size >= limit) {
+                    break
+                }
+            }
+        }
+    }
+
+    @Suppress("LoopWithTooManyJumpStatements")
     private fun fetchValues(
         writer: PrintWriter,
         reader: BufferedReader,
@@ -116,6 +129,7 @@ class MemcachedCacheClient(private val host: String, private val port: Int) {
                         values[currentKey] = valueBuilder.toString().trimEnd()
                         valueBuilder.clear()
                     }
+
                     currentKey = line.split(" ").getOrNull(1)
                 }
 
@@ -123,6 +137,7 @@ class MemcachedCacheClient(private val host: String, private val port: Int) {
                     if (valueBuilder.isNotEmpty()) {
                         valueBuilder.append('\n')
                     }
+
                     valueBuilder.append(line)
                 }
             }
