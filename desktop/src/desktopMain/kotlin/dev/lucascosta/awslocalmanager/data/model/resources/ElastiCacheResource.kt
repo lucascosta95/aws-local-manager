@@ -3,7 +3,7 @@ package dev.lucascosta.awslocalmanager.data.model.resources
 import dev.lucascosta.awslocalmanager.data.model.aws.AwsResourceDefinition
 import dev.lucascosta.awslocalmanager.data.model.aws.RunningResource
 import dev.lucascosta.awslocalmanager.data.model.aws.SuccessSnackbarKey
-import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
+import dev.lucascosta.awslocalmanager.data.remote.ElastiCacheCommands
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorDefaults
 
 object ElastiCacheResource : AwsResourceDefinition {
@@ -26,18 +26,18 @@ object ElastiCacheResource : AwsResourceDefinition {
         val nodeType = extraProperties["node_type"] ?: "cache.t3.micro"
         val numNodes = extraProperties["num_cache_nodes"] ?: "1"
         return if (engine == "redis") {
-            AwsCommands.createElastiCacheReplicationGroup(name, nodeType)
+            ElastiCacheCommands.createElastiCacheReplicationGroup(name, nodeType)
         } else {
-            AwsCommands.createElastiCacheCluster(name, nodeType, numNodes)
+            ElastiCacheCommands.createElastiCacheCluster(name, nodeType, numNodes)
         }
     }
 
     override fun deleteCommand(resource: RunningResource): List<String> {
         val engine = resource.url ?: "redis"
         return if (engine == "redis") {
-            AwsCommands.deleteElastiCacheReplicationGroup(resource.name)
+            ElastiCacheCommands.deleteElastiCacheReplicationGroup(resource.name)
         } else {
-            AwsCommands.deleteElastiCacheCluster(resource.name)
+            ElastiCacheCommands.deleteElastiCacheCluster(resource.name)
         }
     }
 

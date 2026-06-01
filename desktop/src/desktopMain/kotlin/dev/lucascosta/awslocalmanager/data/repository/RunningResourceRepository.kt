@@ -2,8 +2,19 @@ package dev.lucascosta.awslocalmanager.data.repository
 
 import dev.lucascosta.awslocalmanager.data.model.aws.RunningResource
 import dev.lucascosta.awslocalmanager.data.model.process.ProcessConfig
-import dev.lucascosta.awslocalmanager.data.model.resources.*
-import dev.lucascosta.awslocalmanager.data.remote.*
+import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
+import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
+import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
+import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
+import dev.lucascosta.awslocalmanager.data.model.resources.StepFunctionsResource
+import dev.lucascosta.awslocalmanager.data.remote.AwsDynamoDbClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsElastiCacheClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsS3Client
+import dev.lucascosta.awslocalmanager.data.remote.AwsSnsClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsSqsClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsStepFunctionsClient
+import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext

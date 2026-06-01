@@ -1,7 +1,19 @@
 package dev.lucascosta.awslocalmanager.di
 
-import dev.lucascosta.awslocalmanager.data.remote.*
-import dev.lucascosta.awslocalmanager.data.repository.*
+import dev.lucascosta.awslocalmanager.data.remote.AwsDynamoDbClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsElastiCacheClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsS3Client
+import dev.lucascosta.awslocalmanager.data.remote.AwsSnsClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsSqsClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsStepFunctionsClient
+import dev.lucascosta.awslocalmanager.data.remote.EmulatorClient
+import dev.lucascosta.awslocalmanager.data.repository.MessageRepository
+import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
+import dev.lucascosta.awslocalmanager.data.repository.RunningResourceRepository
+import dev.lucascosta.awslocalmanager.data.repository.SavedPayloadRepository
+import dev.lucascosta.awslocalmanager.data.repository.ServiceHealthRepository
+import dev.lucascosta.awslocalmanager.data.repository.ServiceRepository
+import dev.lucascosta.awslocalmanager.data.repository.UpdateRepository
 import org.koin.dsl.module
 
 val dataModule =

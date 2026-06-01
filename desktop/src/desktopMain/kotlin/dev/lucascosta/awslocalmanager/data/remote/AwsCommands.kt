@@ -121,6 +121,9 @@ object AwsCommands {
             value,
         )
 
+}
+
+object ElastiCacheCommands {
     fun createElastiCacheCluster(
         clusterId: String,
         nodeType: String,
