@@ -120,7 +120,6 @@ object AwsCommands {
             "--attribute-value",
             value,
         )
-
 }
 
 object ElastiCacheCommands {
