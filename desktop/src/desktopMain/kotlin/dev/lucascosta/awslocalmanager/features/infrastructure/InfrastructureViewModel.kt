@@ -275,7 +275,7 @@ class InfrastructureViewModel(
     ) {
         val typeName = resource.resourceType?.id ?: resource.rawAwsType
         appendLog(ProcessLine(ctx.logStrings.creatingFmt.replace("{name}", resource.awsName).replace("{type}", typeName), false))
-        val command = resource.resourceType?.createCommand(resource.awsName)
+        val command = resource.resourceType?.createCommand(resource.awsName, resource.extraProperties)
         if (command == null) {
             appendLog(ProcessLine(ctx.logStrings.unsupportedFmt.replace("{type}", typeName), true))
             setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)

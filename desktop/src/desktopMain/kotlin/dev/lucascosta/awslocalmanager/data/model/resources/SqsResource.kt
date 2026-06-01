@@ -18,7 +18,10 @@ object SqsResource : AwsResourceDefinition {
     override val supportsPayloads = true
     override val successSnackbarKey = SuccessSnackbarKey.GENERIC
 
-    override fun createCommand(name: String) = AwsCommands.createSqs(name)
+    override fun createCommand(
+        name: String,
+        extraProperties: Map<String, String>,
+    ) = AwsCommands.createSqs(name)
 
     override fun deleteCommand(resource: RunningResource) = resource.url?.let { AwsCommands.deleteSqs(it) }
 

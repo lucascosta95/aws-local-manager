@@ -217,6 +217,7 @@ val PtBrStrings =
         quickHistoryTitle = "Histórico da sessão",
         quickSuccess = "criado com sucesso",
         quickError = "Erro ao criar",
+        quickElastiCacheEngine = "Engine",
         errorUnknown = "Ocorreu um erro desconhecido",
         errorNetwork = "Erro de rede: {message}",
         errorTimeout = "Tempo de conexão esgotado",

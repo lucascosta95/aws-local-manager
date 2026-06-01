@@ -17,7 +17,10 @@ object S3Resource : AwsResourceDefinition {
     override val supportsPayloads = false
     override val successSnackbarKey = SuccessSnackbarKey.S3
 
-    override fun createCommand(name: String) = AwsCommands.createS3(name)
+    override fun createCommand(
+        name: String,
+        extraProperties: Map<String, String>,
+    ) = AwsCommands.createS3(name)
 
     override fun deleteCommand(resource: RunningResource) = AwsCommands.deleteS3(resource.name)
 

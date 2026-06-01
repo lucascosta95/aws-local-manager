@@ -30,6 +30,7 @@ object AppConstants {
     const val EMULATOR_CONTAINER_NAME = "aws-local-manager-emulator"
     const val EMULATOR_PORT_MAPPING = "4566:4566"
     const val EMULATOR_HEALTH_PATH = "/_floci/health"
+    const val DOCKER_SOCKET_BINDING = "/var/run/docker.sock:/var/run/docker.sock"
 
     // App data
     const val APP_DATA_DIR_NAME = ".aws-local-manager"

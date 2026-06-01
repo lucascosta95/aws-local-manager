@@ -217,6 +217,7 @@ val EnUsStrings =
         quickHistoryTitle = "Session history",
         quickSuccess = "created successfully",
         quickError = "Error creating",
+        quickElastiCacheEngine = "Engine",
         errorUnknown = "An unknown error occurred",
         errorNetwork = "Network error: {message}",
         errorTimeout = "Connection timed out",

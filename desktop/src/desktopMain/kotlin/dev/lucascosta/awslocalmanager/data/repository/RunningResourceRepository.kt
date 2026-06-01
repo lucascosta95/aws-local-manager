@@ -3,11 +3,13 @@ package dev.lucascosta.awslocalmanager.data.repository
 import dev.lucascosta.awslocalmanager.data.model.aws.RunningResource
 import dev.lucascosta.awslocalmanager.data.model.process.ProcessConfig
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
+import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.StepFunctionsResource
 import dev.lucascosta.awslocalmanager.data.remote.AwsDynamoDbClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsElastiCacheClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsS3Client
 import dev.lucascosta.awslocalmanager.data.remote.AwsSnsClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsSqsClient
@@ -23,6 +25,7 @@ class RunningResourceRepository(
     private val s3ClientFactory: (String) -> AwsS3Client,
     private val dynamoDbClientFactory: (String) -> AwsDynamoDbClient,
     private val stepFunctionsClientFactory: (String) -> AwsStepFunctionsClient,
+    private val elastiCacheClientFactory: (String) -> AwsElastiCacheClient = ::AwsElastiCacheClient,
 ) {
     suspend fun fetchAllRunningResources(
         endpoint: String,
@@ -34,8 +37,9 @@ class RunningResourceRepository(
             val s3Job = async { fetchS3Resources(endpoint, activeServices) }
             val dynamoJob = async { fetchDynamoDbResources(endpoint, activeServices) }
             val sfnJob = async { fetchStepFunctionsResources(endpoint, activeServices) }
+            val elcJob = async { fetchElastiCacheResources(endpoint, activeServices) }
 
-            sqsJob.await() + snsJob.await() + s3Job.await() + dynamoJob.await() + sfnJob.await()
+            sqsJob.await() + snsJob.await() + s3Job.await() + dynamoJob.await() + sfnJob.await() + elcJob.await()
         }
 
     suspend fun deleteResources(
@@ -140,6 +144,25 @@ class RunningResourceRepository(
                         type = StepFunctionsResource,
                         arn = arn,
                         url = null,
+                        projectName = null,
+                    )
+                }
+        }
+
+    private suspend fun fetchElastiCacheResources(
+        endpoint: String,
+        activeServices: Set<String>,
+    ): List<RunningResource> =
+        if ("elasticache" !in activeServices) {
+            emptyList()
+        } else {
+            elastiCacheClientFactory(endpoint).listAllClusters().getOrElse { emptyList() }
+                .map { info ->
+                    RunningResource(
+                        name = info.clusterId,
+                        type = ElastiCacheResource,
+                        arn = ElastiCacheResource.buildArn(info.clusterId),
+                        url = info.engine,
                         projectName = null,
                     )
                 }

@@ -28,6 +28,7 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.WINDOW_HEIGHT_DP
 import dev.lucascosta.awslocalmanager.constants.AppConstants.WINDOW_WIDTH_DP
 import dev.lucascosta.awslocalmanager.data.model.aws.ResourceRegistry
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
+import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsSubscriptionResource
@@ -41,6 +42,7 @@ import dev.lucascosta.awslocalmanager.features.dashboard.DashboardViewModel
 import dev.lucascosta.awslocalmanager.features.infrastructure.InfrastructureViewModel
 import dev.lucascosta.awslocalmanager.features.inspector.InspectorViewModel
 import dev.lucascosta.awslocalmanager.features.inspector.handler.DynamoInspectorHandler
+import dev.lucascosta.awslocalmanager.features.inspector.handler.ElastiCacheInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.InspectorHandlerRegistry
 import dev.lucascosta.awslocalmanager.features.inspector.handler.S3InspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
@@ -72,12 +74,14 @@ fun main() {
         SqsResource,
         StepFunctionsResource,
         SnsSubscriptionResource,
+        ElastiCacheResource,
     )
 
     InspectorHandlerRegistry.register(SqsInspectorHandler())
     InspectorHandlerRegistry.register(StepFunctionsInspectorHandler())
     InspectorHandlerRegistry.register(DynamoInspectorHandler())
     InspectorHandlerRegistry.register(S3InspectorHandler())
+    InspectorHandlerRegistry.register(ElastiCacheInspectorHandler())
 
     application {
         val windowState = WindowState(size = DpSize(WINDOW_WIDTH_DP.dp, WINDOW_HEIGHT_DP.dp))

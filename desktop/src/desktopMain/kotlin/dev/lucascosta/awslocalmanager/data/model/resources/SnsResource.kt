@@ -18,7 +18,10 @@ object SnsResource : AwsResourceDefinition {
     override val supportsPayloads = true
     override val successSnackbarKey = SuccessSnackbarKey.GENERIC
 
-    override fun createCommand(name: String) = AwsCommands.createSns(name)
+    override fun createCommand(
+        name: String,
+        extraProperties: Map<String, String>,
+    ) = AwsCommands.createSns(name)
 
     override fun deleteCommand(resource: RunningResource) = resource.arn?.let { AwsCommands.deleteSns(it) }
 

@@ -5,6 +5,7 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.COLIMA_COMMAND
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_READY_POLL_INTERVAL_MS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_READY_POLL_MAX_ATTEMPTS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_RUN_FAILED_MSG
+import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_SOCKET_BINDING
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMPTY_STRING
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_CONTAINER_NAME
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_PORT_MAPPING
@@ -235,6 +236,8 @@ class SetupViewModel(
                 EMULATOR_CONTAINER_NAME,
                 "-p",
                 EMULATOR_PORT_MAPPING,
+                "-v",
+                DOCKER_SOCKET_BINDING,
                 FLOCI_IMAGE,
             )
 

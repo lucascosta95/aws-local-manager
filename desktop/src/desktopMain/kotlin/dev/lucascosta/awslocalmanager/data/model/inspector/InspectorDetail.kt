@@ -46,4 +46,18 @@ sealed class InspectorDetail {
         val entries: List<S3InspectorObject>,
         val currentPrefix: String = "",
     ) : InspectorDetail()
+
+    data class ElastiCacheDetail(
+        val clusterId: String,
+        val engine: String,
+        val status: String,
+        val numNodes: Int,
+        val nodeType: String,
+        val engineVersion: String,
+        val endpoint: String?,
+        val port: Int?,
+        val cacheEntries: List<CacheEntry> = emptyList(),
+        val hasMore: Boolean = false,
+        val cursor: String = "0",
+    ) : InspectorDetail()
 }

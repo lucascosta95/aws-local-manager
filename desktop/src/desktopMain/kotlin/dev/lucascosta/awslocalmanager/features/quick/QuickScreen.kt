@@ -39,6 +39,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import dev.lucascosta.awslocalmanager.data.model.aws.ResourceRegistry
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
+import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
+import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import dev.lucascosta.awslocalmanager.theme.LocalAppColors
@@ -104,6 +106,12 @@ fun QuickScreen(
                         keyType = state.partitionKeyType,
                         onKeyChange = viewModel::setPartitionKey,
                         onTypeChange = viewModel::setPartitionKeyType,
+                    )
+
+                ElastiCacheResource ->
+                    ElastiCacheOptions(
+                        engine = state.elastiCacheEngine,
+                        onEngineChange = viewModel::setElastiCacheEngine,
                     )
 
                 else -> {}
@@ -217,6 +225,27 @@ private fun DynamoOptions(
                     selected = keyType == type,
                     onClick = { onTypeChange(type) },
                     label = { Text(type.name, style = MaterialTheme.typography.labelSmall) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ElastiCacheOptions(
+    engine: ElastiCacheEngine,
+    onEngineChange: (ElastiCacheEngine) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val strings = LocalStrings.current
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(strings.quickElastiCacheEngine, style = MaterialTheme.typography.labelMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ElastiCacheEngine.entries.forEach { e ->
+                FilterChip(
+                    selected = engine == e,
+                    onClick = { onEngineChange(e) },
+                    label = { Text(e.cliValue, style = MaterialTheme.typography.labelSmall) },
                 )
             }
         }

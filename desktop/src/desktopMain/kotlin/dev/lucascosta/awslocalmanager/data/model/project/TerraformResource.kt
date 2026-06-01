@@ -8,6 +8,7 @@ data class TerraformResource(
     val resourceType: AwsResourceDefinition?,
     val rawAwsType: String,
     val filePath: String,
+    val extraProperties: Map<String, String> = emptyMap(),
 ) {
     val isSupported: Boolean get() = resourceType?.isSupported == true
 }

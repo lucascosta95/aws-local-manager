@@ -227,6 +227,7 @@ data class Strings(
     val quickHistoryTitle: String,
     val quickSuccess: String,
     val quickError: String,
+    val quickElastiCacheEngine: String,
     val errorUnknown: String,
     val errorNetwork: String,
     val errorTimeout: String,

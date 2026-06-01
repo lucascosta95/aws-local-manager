@@ -17,7 +17,10 @@ object DynamoDbResource : AwsResourceDefinition {
     override val supportsPayloads = false
     override val successSnackbarKey = SuccessSnackbarKey.DYNAMODB
 
-    override fun createCommand(name: String) = AwsCommands.createDynamoDb(name)
+    override fun createCommand(
+        name: String,
+        extraProperties: Map<String, String>,
+    ) = AwsCommands.createDynamoDb(name)
 
     override fun deleteCommand(resource: RunningResource) = AwsCommands.deleteDynamoDb(resource.name)
 

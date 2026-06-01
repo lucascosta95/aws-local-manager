@@ -8,6 +8,7 @@ import dev.lucascosta.awslocalmanager.data.model.aws.SnsSubscription
 import dev.lucascosta.awslocalmanager.data.model.project.InfraProject
 import dev.lucascosta.awslocalmanager.data.model.project.ProjectConfig
 import dev.lucascosta.awslocalmanager.data.model.project.TerraformResource
+import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -74,13 +75,30 @@ class TerraformReader {
             val tfLabel = match.groupValues[2]
             val resourceType = ResourceRegistry.fromTerraformPrefix(awsPrefix)
             val blockContent = extractBlock(content, match.range.last + 1)
-            val awsName = namePattern.find(blockContent)?.groupValues?.get(1) ?: tfLabel.replace("_", "-")
+            val (awsName, extraProperties) =
+                if (awsPrefix == "aws_elasticache_cluster") {
+                    val clusterId = extractQuotedAttribute(blockContent, "cluster_id") ?: tfLabel.replace("_", "-")
+                    val engine = extractQuotedAttribute(blockContent, "engine") ?: ElastiCacheEngine.REDIS.cliValue
+                    val nodeType = extractQuotedAttribute(blockContent, "node_type") ?: "cache.t3.micro"
+                    val numNodes = extractQuotedAttribute(blockContent, "num_cache_nodes") ?: "1"
+                    val defaultPort =
+                        if (engine == ElastiCacheEngine.REDIS.cliValue) {
+                            ElastiCacheEngine.REDIS.defaultPort
+                        } else {
+                            ElastiCacheEngine.MEMCACHED.defaultPort
+                        }
+                    val port = extractQuotedAttribute(blockContent, "port") ?: defaultPort.toString()
+                    clusterId to mapOf("engine" to engine, "node_type" to nodeType, "num_cache_nodes" to numNodes, "port" to port)
+                } else {
+                    (namePattern.find(blockContent)?.groupValues?.get(1) ?: tfLabel.replace("_", "-")) to emptyMap()
+                }
             TerraformResource(
                 tfLabel = tfLabel,
                 awsName = awsName,
                 resourceType = resourceType,
                 rawAwsType = awsPrefix,
                 filePath = file.absolutePath,
+                extraProperties = extraProperties,
             )
         }.toList()
     }
