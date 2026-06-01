@@ -1026,21 +1026,6 @@ private fun ErrorCard(
     }
 }
 
-@Composable
-private fun CodeBlock(text: String) {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            modifier = Modifier.padding(12.dp),
-        )
-    }
-}
-
 private fun localizedSummary(
     resource: InspectorResource,
     strings: InspectorStrings,

@@ -7,7 +7,11 @@ import dev.lucascosta.awslocalmanager.data.model.inspector.CacheEntry
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorDetail
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorResource
 import dev.lucascosta.awslocalmanager.data.model.process.ProcessConfig
-import dev.lucascosta.awslocalmanager.data.remote.*
+import dev.lucascosta.awslocalmanager.data.remote.AwsElastiCacheClient
+import dev.lucascosta.awslocalmanager.data.remote.ElastiCacheClusterInfo
+import dev.lucascosta.awslocalmanager.data.remote.MemcachedCacheClient
+import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
+import dev.lucascosta.awslocalmanager.data.remote.RedisCacheClient
 
 private const val REDIS_PAGE_SIZE = 100L
 
