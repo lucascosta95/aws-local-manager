@@ -239,4 +239,10 @@ data class Strings(
     val updateDialogSkip: String,
     val updateDialogDismiss: String,
     val navInspector: String,
+    val copyToClipboard: String,
+    val copied: String,
+    val copyRow: String,
+    val copyId: String,
+    val copyAddress: String,
+    val copyPayload: String,
 )

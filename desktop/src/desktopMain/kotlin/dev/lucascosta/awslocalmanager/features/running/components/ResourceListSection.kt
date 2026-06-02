@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.lucascosta.awslocalmanager.components.CopyButton
 import dev.lucascosta.awslocalmanager.data.model.aws.RunningResource
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 
@@ -79,13 +80,20 @@ internal fun ResourceRow(
             Text(resource.name, style = MaterialTheme.typography.bodySmall)
             val detail = resource.arn ?: resource.url ?: ""
             if (detail.isNotBlank()) {
-                Text(
-                    detail,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        detail,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    CopyButton(
+                        textToCopy = detail,
+                        contentDescription = strings.copyAddress,
+                    )
+                }
             }
         }
 
