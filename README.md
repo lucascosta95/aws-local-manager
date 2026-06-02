@@ -31,9 +31,10 @@ AWS Local Manager provides a visual interface that integrates directly with your
 - 💾 **Saved payloads** — store and reuse common message payloads per project via `payloads.json`
 - 🌍 **i18n** — interface available in English and Portuguese (pt-BR)
 - 🎨 **Light and dark theme**
+- 🔍 **Inspector** — browse and inspect the content of SQS queues, Step Functions executions, DynamoDB tables, S3 buckets, and ElastiCache keys directly from the app
 - 🔄 **Auto-update** via GitHub Releases
 
-**Supported services:** SQS · SNS · S3 · DynamoDB · Step Functions
+**Supported services:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache
 
 ---
 
