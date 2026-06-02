@@ -59,6 +59,8 @@ import java.awt.Cursor
 
 private val HANDLE_WIDTH = 6.dp
 private val MIN_COL_WIDTH = 60.dp
+private val ACTION_COLUMN_WIDTH = 32.dp
+private val SCROLLBAR_RESERVED = 12.dp
 private const val TOOLTIP_DELAY_MS = 400
 
 data class TableColumn(
@@ -75,64 +77,83 @@ fun ResizableTable(
     onRowClick: ((Int) -> Unit)? = null,
     selectedRowIndex: Int? = null,
     emptyMessage: String? = null,
+    onRowCopy: ((rowIndex: Int) -> String)? = null,
 ) {
     val density = LocalDensity.current
     val columnWidths = remember(columns) { List(columns.size) { -1f }.toMutableStateList() }
     val scrollState = rememberScrollState()
+    val hasRowCopy = onRowCopy != null
 
     BoxWithConstraints(modifier = modifier) {
         val totalWidthPx = with(density) { maxWidth.toPx() }
 
         if (columnWidths.all { it < 0f } && totalWidthPx > 0f) {
+            val usableWidthPx =
+                if (hasRowCopy) {
+                    val handleTotalPx = (columns.size - 1) * with(density) { HANDLE_WIDTH.toPx() }
+                    totalWidthPx -
+                        with(density) { ACTION_COLUMN_WIDTH.toPx() } -
+                        with(density) { SCROLLBAR_RESERVED.toPx() } -
+                        handleTotalPx
+                } else {
+                    totalWidthPx
+                }
             columns.forEachIndexed { i, col ->
-                columnWidths[i] = totalWidthPx * col.initialWidthFraction
+                columnWidths[i] = usableWidthPx * col.initialWidthFraction
             }
         }
 
         if (columnWidths.all { it >= 0f }) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                TableHeaderRow(
-                    columns = columns,
-                    columnWidths = columnWidths,
-                    onResize = { index, delta ->
-                        resizeColumns(columnWidths, index, delta, columns, density)
-                    },
-                )
-                HorizontalDivider()
-                Box(modifier = Modifier.weight(1f)) {
-                    if (rows.isEmpty() && emptyMessage != null) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = emptyMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(16.dp),
-                            )
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier.fillMaxSize().padding(end = 12.dp).verticalScroll(scrollState),
-                        ) {
-                            rows.forEachIndexed { rowIndex, row ->
-                                TableDataRow(
-                                    values = row,
-                                    columnWidths = columnWidths,
-                                    isOdd = rowIndex % 2 != 0,
-                                    isSelected = selectedRowIndex == rowIndex,
-                                    onClick = onRowClick?.let { cb -> { cb(rowIndex) } },
-                                )
-                                HorizontalDivider(
-                                    thickness = 0.5.dp,
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_RESERVED)) {
+                    TableHeaderRow(
+                        columns = columns,
+                        columnWidths = columnWidths,
+                        hasRowCopy = hasRowCopy,
+                        onResize = { index, delta ->
+                            resizeColumns(columnWidths, index, delta, columns, density)
+                        },
+                    )
+                    HorizontalDivider()
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (rows.isEmpty() && emptyMessage != null) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = emptyMessage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(16.dp),
                                 )
                             }
+                        } else {
+                            Column(
+                                modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
+                            ) {
+                                rows.forEachIndexed { rowIndex, row ->
+                                    TableDataRow(
+                                        values = row,
+                                        columnWidths = columnWidths,
+                                        isOdd = rowIndex % 2 != 0,
+                                        isSelected = selectedRowIndex == rowIndex,
+                                        onClick = onRowClick?.let { cb -> { cb(rowIndex) } },
+                                        rowCopyText = onRowCopy?.invoke(rowIndex),
+                                    )
+                                    HorizontalDivider(
+                                        thickness = 0.5.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                    )
+                                }
+                            }
                         }
-                        VerticalScrollbar(
-                            adapter = rememberScrollbarAdapter(scrollState),
-                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
-                        )
                     }
+                }
+
+                if (rows.isNotEmpty() || emptyMessage == null) {
+                    VerticalScrollbar(
+                        adapter = rememberScrollbarAdapter(scrollState),
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
+                    )
                 }
             }
         }
@@ -164,6 +185,7 @@ private fun resizeColumns(
 private fun TableHeaderRow(
     columns: List<TableColumn>,
     columnWidths: List<Float>,
+    hasRowCopy: Boolean,
     onResize: (index: Int, delta: Float) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -200,6 +222,10 @@ private fun TableHeaderRow(
                 ResizeHandle(onDrag = { delta -> onResize(index, delta) })
             }
         }
+
+        if (hasRowCopy) {
+            Spacer(modifier = Modifier.width(ACTION_COLUMN_WIDTH).fillMaxHeight())
+        }
     }
 }
 
@@ -210,6 +236,7 @@ private fun TableDataRow(
     isOdd: Boolean,
     isSelected: Boolean = false,
     onClick: (() -> Unit)? = null,
+    rowCopyText: String? = null,
 ) {
     val density = LocalDensity.current
     var isHovered by remember { mutableStateOf(false) }
@@ -282,6 +309,17 @@ private fun TableDataRow(
 
             if (index < values.size - 1) {
                 Spacer(modifier = Modifier.width(HANDLE_WIDTH).fillMaxHeight())
+            }
+        }
+
+        if (rowCopyText != null) {
+            Box(
+                modifier = Modifier.width(ACTION_COLUMN_WIDTH).fillMaxHeight(),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isHovered) {
+                    CopyButton(textToCopy = rowCopyText)
+                }
             }
         }
     }

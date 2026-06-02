@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import dev.lucascosta.awslocalmanager.components.CopyButton
 import dev.lucascosta.awslocalmanager.constants.AppConstants.TIME_FORMAT_PATTERN
 import dev.lucascosta.awslocalmanager.data.model.aws.MessageHistoryItem
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
@@ -177,6 +178,12 @@ private fun HistoryItem(
                         item.jsonBody,
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = JetBrainsMonoFontFamily),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(end = 24.dp),
+                    )
+                    CopyButton(
+                        textToCopy = item.jsonBody,
+                        contentDescription = strings.copyPayload,
+                        modifier = Modifier.align(Alignment.TopEnd),
                     )
                 }
             }

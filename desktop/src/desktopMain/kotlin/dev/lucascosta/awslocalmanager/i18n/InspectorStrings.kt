@@ -72,6 +72,8 @@ data class InspectorStrings(
     val inspectorS3ColumnName: String,
     val inspectorS3ColumnSize: String,
     val inspectorS3ColumnDate: String,
+    val copyInput: String,
+    val copyOutput: String,
 )
 
 val InspectorStringsEnUs =
@@ -136,6 +138,8 @@ val InspectorStringsEnUs =
         inspectorS3ColumnName = "Name",
         inspectorS3ColumnSize = "Size",
         inspectorS3ColumnDate = "Last Modified",
+        copyInput = "Copy input",
+        copyOutput = "Copy output",
     )
 
 val InspectorStringsPtBr =
@@ -200,4 +204,6 @@ val InspectorStringsPtBr =
         inspectorS3ColumnName = "Nome",
         inspectorS3ColumnSize = "Tamanho",
         inspectorS3ColumnDate = "Data",
+        copyInput = "Copiar input",
+        copyOutput = "Copiar output",
     )

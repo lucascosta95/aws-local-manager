@@ -229,4 +229,10 @@ val PtBrStrings =
         updateDialogSkip = "Pular esta versão",
         updateDialogDismiss = "Lembrar depois",
         navInspector = "Inspetor",
+        copyToClipboard = "Copiar",
+        copied = "Copiado!",
+        copyRow = "Copiar linha",
+        copyId = "Copiar ID",
+        copyAddress = "Copiar endereço",
+        copyPayload = "Copiar payload",
     )

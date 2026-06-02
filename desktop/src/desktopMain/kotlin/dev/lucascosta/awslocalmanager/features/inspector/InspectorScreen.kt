@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.lucascosta.awslocalmanager.components.CopyButton
 import dev.lucascosta.awslocalmanager.components.ResizableTable
 import dev.lucascosta.awslocalmanager.components.TableColumn
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorDetail
@@ -69,6 +70,7 @@ import dev.lucascosta.awslocalmanager.data.model.inspector.SqsInspectorMessage
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
 import dev.lucascosta.awslocalmanager.i18n.InspectorStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
+import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -613,6 +615,7 @@ private fun SqsDetailView(
 @Composable
 private fun SqsMessageItem(message: SqsInspectorMessage) {
     val strings = LocalInspectorStrings.current
+    val appStrings = LocalStrings.current
     var expanded by remember(message.messageId) { mutableStateOf(false) }
 
     Column(
@@ -642,17 +645,25 @@ private fun SqsMessageItem(message: SqsInspectorMessage) {
             )
         }
 
-        Text(
-            text =
-                if (expanded) {
-                    message.body
-                } else {
-                    message.body.take(120)
-                        .let { if (message.body.length > 120) "$it…" else it }
-                },
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text =
+                    if (expanded) {
+                        message.body
+                    } else {
+                        message.body.take(120)
+                            .let { if (message.body.length > 120) "$it…" else it }
+                    },
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth().padding(end = 24.dp),
+            )
+            CopyButton(
+                textToCopy = message.body,
+                contentDescription = appStrings.copyPayload,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
+        }
 
         if (expanded && message.attributes.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
@@ -790,11 +801,13 @@ private fun StepFunctionsDetailView(
                         label = strings.inspectorSfnInput,
                         content = detail.executionInput,
                         noDataText = strings.inspectorSfnNoData,
+                        copyContentDescription = strings.copyInput,
                     )
                     SfnJsonBlock(
                         label = strings.inspectorSfnOutput,
                         content = detail.executionOutput,
                         noDataText = strings.inspectorSfnNoData,
+                        copyContentDescription = strings.copyOutput,
                     )
                 }
             }
@@ -822,16 +835,26 @@ private fun SfnJsonBlock(
     label: String,
     content: String?,
     noDataText: String,
+    copyContentDescription: String = "",
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (content != null) {
+                CopyButton(
+                    textToCopy = formatJson(content),
+                    contentDescription = copyContentDescription,
+                )
+            }
+        }
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
@@ -885,7 +908,6 @@ private fun DynamoDetailView(
                 modifier = Modifier.weight(1f),
             )
         }
-        HorizontalDivider()
 
         if (detail.items.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -903,6 +925,21 @@ private fun DynamoDetailView(
                 columns = tableColumns,
                 rows = tableRows,
                 modifier = Modifier.weight(1f),
+                onRowCopy = { rowIndex ->
+                    buildString {
+                        append("{\n")
+                        detail.columns.forEachIndexed { i, col ->
+                            val value = tableRows.getOrNull(rowIndex)?.getOrElse(i) { "" } ?: ""
+                            append("  \"$col\": \"${value.replace("\"", "\\\"")}\",\n")
+                        }
+
+                        if (endsWith(",\n")) {
+                            replace(length - 2, length, "\n")
+                        }
+
+                        append("}")
+                    }
+                },
             )
 
             if (detail.hasMore) {
@@ -954,7 +991,6 @@ private fun S3DetailView(
             onNavigateUp = onNavigateUp,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         )
-        HorizontalDivider()
 
         ResizableTable(
             columns =
@@ -1174,8 +1210,6 @@ private fun ElastiCacheDetailView(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
-        HorizontalDivider()
-
         if (detail.cacheEntries.isEmpty()) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text(
@@ -1208,6 +1242,16 @@ private fun ElastiCacheDetailView(
                 columns = tableColumns,
                 rows = tableRows,
                 modifier = Modifier.weight(1f),
+                onRowCopy = { rowIndex ->
+                    val entry = detail.cacheEntries[rowIndex]
+                    val ttlStr =
+                        when (val ttl = entry.ttl) {
+                            null -> "∞"
+                            -2L -> "-"
+                            else -> "${ttl}s"
+                        }
+                    """{ "key": "${entry.key}", "value": "${entry.value ?: ""}", "ttl": "$ttlStr" }"""
+                },
             )
         }
 

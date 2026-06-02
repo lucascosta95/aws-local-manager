@@ -229,4 +229,10 @@ val EnUsStrings =
         updateDialogSkip = "Skip this version",
         updateDialogDismiss = "Remind me later",
         navInspector = "Inspector",
+        copyToClipboard = "Copy",
+        copied = "Copied!",
+        copyRow = "Copy row",
+        copyId = "Copy ID",
+        copyAddress = "Copy address",
+        copyPayload = "Copy payload",
     )
