@@ -109,7 +109,7 @@ AWS Local Manager discovers projects by scanning a directory you configure in **
 ~/projects/                        ← configured root directory
 ├── my-api/
 │   └── infra/
-│       ├── aws-local.config.json  ← project metadata (name, description)
+│       ├── aws-local.config.json  ← project metadata (name)
 │       ├── queues.tf
 │       ├── topics.tf
 │       └── payloads.json          ← saved message payloads (optional)
@@ -118,6 +118,178 @@ AWS Local Manager discovers projects by scanning a directory you configure in **
         ├── aws-local.config.json
         └── tables.tf
 ```
+
+### aws-local.config.json
+
+Identifies the project inside the app. Only `name` is required:
+
+```json
+{
+  "name": "Nimbus API"
+}
+```
+
+### Terraform templates
+
+The app never runs `terraform apply`. It reads the `.tf` files with a lightweight parser and calls the AWS CLI against the emulator, so the files can stay minimal — no `provider`, `backend`, IAM, variables or modules are needed.
+
+How the parser reads a file:
+
+- Only `.tf` files placed **directly** inside `infra/` are read; subdirectories are skipped.
+- Every resource must be a top-level block: `resource "<aws_type>" "<label>" { ... }`. The label accepts letters, digits and `_` only.
+- The AWS name comes from the `name` attribute of the block. When it is absent, the app falls back to the label with `_` replaced by `-`.
+- Values must be literal strings. `var.*`, `local.*` and `${...}` interpolations are **not** resolved.
+- Any other attribute is ignored by the app and harmless to keep, so the same file still works with real Terraform.
+
+> 💡 On the **Infrastructure** screen, the **Create template** button writes a ready-to-edit file for any of the types below.
+
+#### SQS
+
+```hcl
+resource "aws_sqs_queue" "nimbus_queue" {
+  name = "nimbus-queue"
+}
+```
+
+Timing and retry attributes are accepted and kept for real Terraform runs, but the app creates the queue with the emulator defaults:
+
+```hcl
+resource "aws_sqs_queue" "nimbus_queue" {
+  name                       = "nimbus-queue"
+  visibility_timeout_seconds = 30
+  message_retention_seconds  = 345600
+  delay_seconds              = 0
+  receive_wait_time_seconds  = 0
+}
+```
+
+A dead-letter queue is just a second queue. The app creates both, but the redrive policy itself is not applied to the emulator — use **Quick Create** when you need the queue wired to a DLQ:
+
+```hcl
+resource "aws_sqs_queue" "nimbus_queue_dlq" {
+  name = "nimbus-queue-dlq"
+}
+
+resource "aws_sqs_queue" "nimbus_queue" {
+  name = "nimbus-queue"
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.nimbus_queue_dlq.arn
+    maxReceiveCount     = 3
+  })
+}
+```
+
+#### SNS
+
+```hcl
+resource "aws_sns_topic" "nimbus_topic" {
+  name = "nimbus-topic"
+}
+```
+
+#### SNS subscription
+
+`topic_arn` and `endpoint` may reference another resource declared in the same folder (`aws_sns_topic.<label>.arn`, `aws_sqs_queue.<label>.arn`) or carry a literal ARN. The subscription is applied only when the endpoint resource is part of the selected resources:
+
+```hcl
+resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
+  topic_arn            = aws_sns_topic.nimbus_topic.arn
+  protocol             = "sqs"
+  endpoint             = aws_sqs_queue.nimbus_queue.arn
+  raw_message_delivery = true
+}
+```
+
+`filter_policy` is supported through `jsonencode`, with one attribute per line and a valid JSON value on each of them (nested objects are not parsed):
+
+```hcl
+resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
+  topic_arn = aws_sns_topic.nimbus_topic.arn
+  protocol  = "sqs"
+  endpoint  = aws_sqs_queue.nimbus_queue.arn
+
+  filter_policy       = jsonencode({
+    eventType = ["created", "updated"]
+    priority  = ["high"]
+  })
+  filter_policy_scope = "MessageAttributes"
+}
+```
+
+#### S3
+
+The parser looks for `name`, which an `aws_s3_bucket` block does not have, so the bucket name is derived from the label with `_` replaced by `-`. Keep the label and the `bucket` value aligned:
+
+```hcl
+resource "aws_s3_bucket" "nimbus_bucket" {
+  bucket = "nimbus-bucket"
+}
+```
+
+#### DynamoDB
+
+The table is always created with a single `id` partition key of type `S` and `PAY_PER_REQUEST` billing, regardless of the keys declared in the file:
+
+```hcl
+resource "aws_dynamodb_table" "nimbus_table" {
+  name         = "nimbus-table"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+}
+```
+
+#### Step Functions
+
+Only `name` is used. The state machine is created in the emulator with a single pass-through state, so the `definition` below is kept for real Terraform runs and for documentation:
+
+```hcl
+resource "aws_sfn_state_machine" "nimbus_flow" {
+  name     = "nimbus-flow"
+  role_arn = "arn:aws:iam::000000000000:role/stepfunctions-role"
+
+  definition = jsonencode({
+    Comment = "nimbus-flow",
+    StartAt = "HelloWorld",
+    States  = {
+      HelloWorld = { Type = "Pass", End = true }
+    }
+  })
+}
+```
+
+#### ElastiCache
+
+The name comes from `cluster_id`. With `engine = "redis"` the app creates a replication group; with `engine = "memcached"` it creates a cache cluster using `num_cache_nodes`:
+
+```hcl
+resource "aws_elasticache_cluster" "nimbus_cache" {
+  cluster_id      = "nimbus-cache"
+  engine          = "redis"
+  node_type       = "cache.t3.micro"
+  num_cache_nodes = 1
+  port            = 6379
+}
+```
+
+The parser only reads quoted values, so an unquoted `num_cache_nodes = 1` falls back to the default of a single node — write it as `num_cache_nodes = "2"` when a Memcached cluster needs more. `port` is never sent to the emulator: Redis answers on `6379` and Memcached on `11211`.
+
+#### What the app reads from each type
+
+| Terraform type | Attributes used | Created in the emulator as |
+|---|---|---|
+| `aws_sqs_queue` | `name` | Queue with emulator defaults |
+| `aws_sns_topic` | `name` | Topic |
+| `aws_sns_topic_subscription` | `topic_arn`, `endpoint`, `protocol`, `raw_message_delivery`, `filter_policy`, `filter_policy_scope` | Subscription |
+| `aws_s3_bucket` | block label | Bucket |
+| `aws_dynamodb_table` | `name` | Table with `id` (`S`) partition key, `PAY_PER_REQUEST` |
+| `aws_sfn_state_machine` | `name` | State machine with a single `Pass` state |
+| `aws_elasticache_cluster` | `cluster_id`, `engine`, `node_type`, `num_cache_nodes` (quoted) | Replication group (redis) or cache cluster (memcached) |
 
 ### payloads.json
 
