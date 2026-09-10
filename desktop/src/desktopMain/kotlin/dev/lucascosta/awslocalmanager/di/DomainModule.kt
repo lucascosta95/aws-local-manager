@@ -6,6 +6,7 @@ import dev.lucascosta.awslocalmanager.domain.DynamoDbHealthProbe
 import dev.lucascosta.awslocalmanager.domain.ElastiCacheHealthProbe
 import dev.lucascosta.awslocalmanager.domain.S3HealthProbe
 import dev.lucascosta.awslocalmanager.domain.ServiceStatusChecker
+import dev.lucascosta.awslocalmanager.domain.SkillInstaller
 import dev.lucascosta.awslocalmanager.domain.SnsHealthProbe
 import dev.lucascosta.awslocalmanager.domain.SqsHealthProbe
 import dev.lucascosta.awslocalmanager.domain.StepFunctionsHealthProbe
@@ -32,4 +33,5 @@ val domainModule =
 
         single { AwsResourceChecker(get()) }
         single { AssociateResourcesUseCase() }
+        single { SkillInstaller() }
     }

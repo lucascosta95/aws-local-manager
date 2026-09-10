@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "id": "aws-local-infra",
+      "name": "AWS Local Manager infrastructure",
+      "description": "Creates or repairs the infra/ folder that AWS Local Manager reads, so a project can be debugged against the local AWS emulator. The agent infers queues, topics and buckets from the code and writes the Terraform templates.",
+      "version": "1.0.0",
+      "path": "aws-local-infra/SKILL.md",
+      "sha256": "67d7f2df5a4a3cbcbee8da46f787b73ae1dccf8c9b6cc7360bcd06d779402a86",
+      "tags": ["terraform", "setup", "sqs", "sns", "s3", "dynamodb"]
+    }
+  ]
+}

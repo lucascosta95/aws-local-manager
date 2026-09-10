@@ -13,6 +13,7 @@ val EnUsStrings =
         navInfrastructure = "Infrastructure",
         navProject = "Projects",
         navQuick = "Quick Create",
+        navSkills = "Skills",
         topBarConnectionOnline = "Connected",
         topBarConnectionOffline = "Disconnected",
         topBarRefresh = "Refresh",

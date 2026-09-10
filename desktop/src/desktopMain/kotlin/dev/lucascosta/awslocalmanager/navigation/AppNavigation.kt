@@ -16,6 +16,7 @@ import dev.lucascosta.awslocalmanager.features.quick.QuickScreen
 import dev.lucascosta.awslocalmanager.features.running.RunningScreen
 import dev.lucascosta.awslocalmanager.features.settings.SettingsScreen
 import dev.lucascosta.awslocalmanager.features.setup.SetupScreen
+import dev.lucascosta.awslocalmanager.features.skills.SkillsScreen
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -58,6 +59,7 @@ fun AppNavigation(
             Screen.Running -> RunningScreen()
             Screen.Quick -> QuickScreen()
             Screen.Inspector -> InspectorScreen()
+            Screen.Skills -> SkillsScreen()
         }
     }
 }

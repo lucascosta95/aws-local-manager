@@ -13,6 +13,8 @@ import dev.lucascosta.awslocalmanager.data.repository.RunningResourceRepository
 import dev.lucascosta.awslocalmanager.data.repository.SavedPayloadRepository
 import dev.lucascosta.awslocalmanager.data.repository.ServiceHealthRepository
 import dev.lucascosta.awslocalmanager.data.repository.ServiceRepository
+import dev.lucascosta.awslocalmanager.data.repository.SkillCatalogRepository
+import dev.lucascosta.awslocalmanager.data.repository.SkillStateRepository
 import dev.lucascosta.awslocalmanager.data.repository.UpdateRepository
 import org.koin.dsl.module
 
@@ -42,6 +44,8 @@ val dataModule =
         single { ServiceRepository(get()) }
         single { ServiceHealthRepository(get()) }
         single { SavedPayloadRepository() }
+        single { SkillCatalogRepository() }
+        single { SkillStateRepository() }
 
         single {
             RunningResourceRepository(

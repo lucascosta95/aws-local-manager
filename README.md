@@ -131,9 +131,22 @@ Identifies the project inside the app. Only `name` is required:
 
 ### AI agent skill
 
-If you drive your project with an AI coding agent, install the bundled skill inside the
-project you want to debug. The agent then reads the code, infers the queues, topics and
-buckets it already uses, and writes `infra/` with the correct structure:
+The **Skills** screen installs the bundled skill into the AI coding tools found in your home
+folder. The agent then reads the project, infers the queues, topics and buckets it already
+uses, and writes `infra/` with the correct structure.
+
+| Tool | Where it lands |
+|---|---|
+| Claude Code | `~/.claude/skills/<skill>/SKILL.md` |
+| Cursor | `~/.cursor/rules/<skill>.mdc` |
+| Codex CLI | `~/.codex/AGENTS.md`, inside a delimited block |
+| Gemini CLI | `~/.gemini/GEMINI.md`, inside a delimited block |
+
+Shared instruction files are edited only inside that block, and a `.bak` copy is written before
+any change, so your own instructions survive. The screen shows every absolute path before
+writing anything. The catalog ships inside the app and is refreshed from GitHub when online.
+
+To install by hand instead, or into a single project rather than globally:
 
 ```bash
 mkdir -p .claude/skills/aws-local-infra && \
@@ -141,9 +154,8 @@ curl -fsSL https://raw.githubusercontent.com/lucascosta95/aws-local-manager/main
   -o .claude/skills/aws-local-infra/SKILL.md
 ```
 
-Then ask it something like *"set up this project for local AWS debugging"*. The skill is
-plain Markdown, so it also works pasted into `AGENTS.md` or into the prompt of any other
-assistant.
+Then ask it something like *"set up this project for local AWS debugging"*. The skill is plain
+Markdown, so it also works pasted into `AGENTS.md` or into the prompt of any other assistant.
 
 ### Terraform templates
 

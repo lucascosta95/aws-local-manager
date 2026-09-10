@@ -52,10 +52,13 @@ import dev.lucascosta.awslocalmanager.features.quick.QuickViewModel
 import dev.lucascosta.awslocalmanager.features.running.RunningViewModel
 import dev.lucascosta.awslocalmanager.features.settings.SettingsViewModel
 import dev.lucascosta.awslocalmanager.features.setup.SetupViewModel
+import dev.lucascosta.awslocalmanager.features.skills.SkillsViewModel
 import dev.lucascosta.awslocalmanager.features.update.UpdateViewModel
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
+import dev.lucascosta.awslocalmanager.i18n.LocalSkillsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import dev.lucascosta.awslocalmanager.i18n.inspectorStringsForLanguage
+import dev.lucascosta.awslocalmanager.i18n.skillsStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.stringsForLanguage
 import dev.lucascosta.awslocalmanager.navigation.AppNavigation
 import dev.lucascosta.awslocalmanager.navigation.Screen
@@ -115,6 +118,7 @@ fun AppRoot() {
             koinInject<RunningViewModel>(),
             koinInject<QuickViewModel>(),
             koinInject<InspectorViewModel>(),
+            koinInject<SkillsViewModel>(),
             updateViewModel,
         )
 
@@ -131,6 +135,7 @@ fun AppRoot() {
     CompositionLocalProvider(
         LocalStrings provides stringsForLanguage(prefs.language),
         LocalInspectorStrings provides inspectorStringsForLanguage(prefs.language),
+        LocalSkillsStrings provides skillsStringsForLanguage(prefs.language),
     ) {
         DesktopAppTheme(appTheme = prefs.theme) {
             AppContent(

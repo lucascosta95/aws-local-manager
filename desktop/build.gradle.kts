@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.security.MessageDigest
 
 val appVersion = "1.1.0"
 val githubOwner = "lucascosta95"
@@ -28,6 +29,33 @@ val generateBuildConfig by tasks.registering {
     }
 }
 
+val skillsDir = rootProject.file("skills")
+
+val verifySkillCatalog by tasks.registering {
+    val catalogFile = File(skillsDir, "catalog.json")
+    inputs.dir(skillsDir)
+    doLast {
+        Regex("\\{[^{}]*\\}").findAll(catalogFile.readText()).forEach { match ->
+            val entry = match.value
+            val path = Regex("\"path\"\\s*:\\s*\"([^\"]+)\"").find(entry)?.groupValues?.get(1)
+            val expected = Regex("\"sha256\"\\s*:\\s*\"([^\"]+)\"").find(entry)?.groupValues?.get(1)
+            if (path != null && expected != null) {
+                val file = File(skillsDir, path)
+                if (!file.isFile) {
+                    error("Skill file listed in catalog.json is missing: $path")
+                }
+                val actual =
+                    MessageDigest.getInstance("SHA-256")
+                        .digest(file.readBytes())
+                        .joinToString("") { byte -> "%02x".format(byte) }
+                if (actual != expected) {
+                    error("Checksum mismatch for $path. Set sha256 in skills/catalog.json to $actual")
+                }
+            }
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.compose.multiplatform)
@@ -41,6 +69,7 @@ kotlin {
     sourceSets {
         val desktopMain by getting {
             kotlin.srcDir(generateBuildConfig)
+            resources.srcDir(skillsDir)
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation(compose.material3)
@@ -66,6 +95,10 @@ kotlin {
             }
         }
     }
+}
+
+tasks.matching { it.name.endsWith("ProcessResources") }.configureEach {
+    dependsOn(verifySkillCatalog)
 }
 
 compose.resources {

@@ -131,9 +131,23 @@ Identifica o projeto dentro do app. Apenas `name` é obrigatório:
 
 ### Skill para agentes de IA
 
-Se você conduz o projeto com um agente de IA, instale a skill do repositório dentro do
-projeto que quer depurar. O agente lê o código, infere as filas, tópicos e buckets que já
-são usados e escreve o `infra/` com a estrutura correta:
+A tela **Skills** instala a skill do repositório nas ferramentas de IA encontradas na sua pasta
+pessoal. O agente então lê o projeto, infere as filas, tópicos e buckets que já são usados e
+escreve o `infra/` com a estrutura correta.
+
+| Ferramenta | Onde é gravada |
+|---|---|
+| Claude Code | `~/.claude/skills/<skill>/SKILL.md` |
+| Cursor | `~/.cursor/rules/<skill>.mdc` |
+| Codex CLI | `~/.codex/AGENTS.md`, dentro de um bloco delimitado |
+| Gemini CLI | `~/.gemini/GEMINI.md`, dentro de um bloco delimitado |
+
+Arquivos de instrução compartilhados são alterados só dentro desse bloco, e uma cópia `.bak` é
+gravada antes de qualquer mudança, então as suas próprias instruções continuam lá. A tela mostra
+todos os caminhos absolutos antes de gravar. O catálogo vem dentro do app e é atualizado pelo
+GitHub quando há conexão.
+
+Para instalar na mão, ou em um único projeto em vez de globalmente:
 
 ```bash
 mkdir -p .claude/skills/aws-local-infra && \
@@ -141,8 +155,8 @@ curl -fsSL https://raw.githubusercontent.com/lucascosta95/aws-local-manager/main
   -o .claude/skills/aws-local-infra/SKILL.md
 ```
 
-Depois peça algo como *"prepare este projeto para debug local da AWS"*. A skill é Markdown
-puro, então também funciona colada no `AGENTS.md` ou no prompt de qualquer outro assistente.
+Depois peça algo como *"prepare este projeto para debug local da AWS"*. A skill é Markdown puro,
+então também funciona colada no `AGENTS.md` ou no prompt de qualquer outro assistente.
 
 ### Templates Terraform
 

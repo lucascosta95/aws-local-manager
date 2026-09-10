@@ -42,6 +42,15 @@ object AppConstants {
     const val PROJECT_INFRA_SUBDIR = "infra"
     const val AWS_LOCAL_CONFIG_FILENAME = "aws-local.config.json"
 
+    // Skills
+    const val SKILLS_STATE_FILENAME = "skills.json"
+    const val SKILL_CATALOG_FILENAME = "catalog.json"
+    const val SKILL_MANIFEST_FILENAME = "SKILL.md"
+    const val SKILL_CATALOG_REF = "main"
+    const val SKILL_CATALOG_DIR = "skills"
+    const val SKILL_BLOCK_NAMESPACE = "aws-local-manager"
+    const val SKILL_BACKUP_SUFFIX = ".bak"
+
     // Window
     const val WINDOW_WIDTH_DP = 1280
     const val WINDOW_HEIGHT_DP = 800
