@@ -49,7 +49,7 @@ O AWS Local Manager oferece uma interface visual integrada aos seus projetos Ter
 Baixe a imagem do emulador antes de usar pela primeira vez:
 
 ```bash
-docker pull floci/floci:1.5.19
+docker pull floci/floci:2.0.1
 ```
 
 > A tela de Setup verifica todos os pré-requisitos na inicialização e pode corrigir a maioria dos problemas com um clique.

@@ -49,7 +49,7 @@ AWS Local Manager provides a visual interface that integrates directly with your
 Pull the emulator image before first launch:
 
 ```bash
-docker pull floci/floci:1.5.19
+docker pull floci/floci:2.0.1
 ```
 
 > The Setup screen checks all prerequisites on launch and can auto-fix most issues.
