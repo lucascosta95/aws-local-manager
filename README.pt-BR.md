@@ -25,16 +25,16 @@ O AWS Local Manager oferece uma interface visual integrada aos seus projetos Ter
 
 - 🩺 **Dashboard de saúde em tempo real** — monitore todos os serviços AWS emulados com intervalo de polling configurável
 - 🏗️ **Infraestrutura via Terraform** — leia seus arquivos `.tf` e provisione recursos diretamente no emulador sem precisar rodar `terraform apply`
-- ⚡ **Criação rápida** — crie filas SQS, tópicos SNS, buckets S3 e tabelas DynamoDB sem Terraform
+- ⚡ **Criação rápida** — crie filas SQS, tópicos SNS, buckets S3, tabelas DynamoDB e parâmetros SSM sem Terraform
 - 📤 **Publicação de mensagens** — envie mensagens JSON para SQS, SNS, DynamoDB e Step Functions; faça upload de arquivos para o S3
 - 🔁 **Execução de Step Functions** — dispare execuções de máquinas de estado com input JSON personalizado
 - 💾 **Payloads salvos** — armazene e reutilize mensagens comuns por projeto via `payloads.json`
 - 🌍 **i18n** — interface disponível em inglês e português (pt-BR)
 - 🎨 **Tema claro e escuro**
-- 🔍 **Inspector** — navegue e inspecione o conteúdo de filas SQS, execuções de Step Functions, tabelas DynamoDB, buckets S3 e chaves ElastiCache diretamente pelo app
+- 🔍 **Inspector** — navegue e inspecione o conteúdo de filas SQS, execuções de Step Functions, tabelas DynamoDB, buckets S3, chaves ElastiCache e parâmetros SSM diretamente pelo app
 - 🔄 **Auto-update** via GitHub Releases
 
-**Serviços suportados:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache
+**Serviços suportados:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache · SSM Parameter Store
 
 ---
 
@@ -166,7 +166,7 @@ Como o parser lê um arquivo:
 
 - Apenas arquivos `.tf` **diretamente** dentro de `infra/` são lidos; subdiretórios são ignorados.
 - Todo recurso precisa ser um bloco de primeiro nível: `resource "<tipo_aws>" "<label>" { ... }`. O label aceita apenas letras, números e `_`.
-- O nome do recurso na AWS vem do atributo `name` do bloco. Quando ele não existe, o app usa o label com `_` trocado por `-`.
+- O nome do recurso na AWS vem do atributo `name` do bloco. Quando ele não existe, o app usa o label com `_` trocado por `-`. A exceção é `aws_ssm_parameter`, que é ignorado quando o `name` está ausente.
 - Os valores precisam ser strings literais. `var.*`, `local.*` e interpolações `${...}` **não** são resolvidos.
 - Qualquer outro atributo é ignorado pelo app e pode continuar no arquivo, então o mesmo `.tf` segue válido para um Terraform de verdade.
 
@@ -308,6 +308,22 @@ resource "aws_elasticache_cluster" "nimbus_cache" {
 
 O parser só lê valores entre aspas, então um `num_cache_nodes = 1` sem aspas cai no padrão de um único nó — escreva `num_cache_nodes = "2"` quando um cluster Memcached precisar de mais. A `port` nunca é enviada ao emulador: o Redis responde em `6379` e o Memcached em `11211`.
 
+#### SSM Parameter Store
+
+O `name` é obrigatório neste tipo. Um label de bloco Terraform não aceita barra, então o fallback normal para o label inventaria um nome de parâmetro errado — um bloco sem `name` é ignorado pelo app.
+
+```hcl
+resource "aws_ssm_parameter" "nimbus_db_host" {
+  name  = "/nimbus/db/host"
+  type  = "String"
+  value = "localhost"
+}
+```
+
+O app envia `name`, `value` e `type` ao emulador com `put-parameter --overwrite`, então criar um parâmetro que já existe substitui o valor e incrementa a versão. Um `value` ausente é enviado como string vazia e um `type` ausente cai no padrão `String`.
+
+> ⚠️ Um valor `SecureString` escrito em um arquivo `.tf` é um segredo em texto puro no seu repositório, e o Inspector o exibe descriptografado. Para depuração local, prefira `String`.
+
 #### O que o app lê de cada tipo
 
 | Tipo Terraform | Atributos usados | Criado no emulador como |
@@ -319,6 +335,7 @@ O parser só lê valores entre aspas, então um `num_cache_nodes = 1` sem aspas 
 | `aws_dynamodb_table` | `name` | Tabela com chave de partição `id` (`S`), `PAY_PER_REQUEST` |
 | `aws_sfn_state_machine` | `name` | Máquina de estado com um único `Pass` |
 | `aws_elasticache_cluster` | `cluster_id`, `engine`, `node_type`, `num_cache_nodes` (entre aspas) | Replication group (redis) ou cache cluster (memcached) |
+| `aws_ssm_parameter` | `name` (obrigatório), `value`, `type` | Parâmetro criado com `put-parameter --overwrite` |
 
 ### payloads.json
 

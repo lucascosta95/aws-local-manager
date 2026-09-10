@@ -25,16 +25,16 @@ AWS Local Manager provides a visual interface that integrates directly with your
 
 - 🩺 **Real-time health dashboard** — monitor all emulated AWS services at a glance, with configurable polling interval
 - 🏗️ **Infrastructure from Terraform** — read your `.tf` files and provision resources directly into the emulator without running `terraform apply`
-- ⚡ **Quick Create** — spin up SQS queues, SNS topics, S3 buckets, and DynamoDB tables without Terraform
+- ⚡ **Quick Create** — spin up SQS queues, SNS topics, S3 buckets, DynamoDB tables, and SSM parameters without Terraform
 - 📤 **Message publishing** — send JSON messages to SQS, SNS, DynamoDB, and Step Functions; upload files to S3
 - 🔁 **Step Functions execution** — trigger state machine executions with custom JSON input
 - 💾 **Saved payloads** — store and reuse common message payloads per project via `payloads.json`
 - 🌍 **i18n** — interface available in English and Portuguese (pt-BR)
 - 🎨 **Light and dark theme**
-- 🔍 **Inspector** — browse and inspect the content of SQS queues, Step Functions executions, DynamoDB tables, S3 buckets, and ElastiCache keys directly from the app
+- 🔍 **Inspector** — browse and inspect the content of SQS queues, Step Functions executions, DynamoDB tables, S3 buckets, ElastiCache keys, and SSM parameters directly from the app
 - 🔄 **Auto-update** via GitHub Releases
 
-**Supported services:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache
+**Supported services:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache · SSM Parameter Store
 
 ---
 
@@ -165,7 +165,7 @@ How the parser reads a file:
 
 - Only `.tf` files placed **directly** inside `infra/` are read; subdirectories are skipped.
 - Every resource must be a top-level block: `resource "<aws_type>" "<label>" { ... }`. The label accepts letters, digits and `_` only.
-- The AWS name comes from the `name` attribute of the block. When it is absent, the app falls back to the label with `_` replaced by `-`.
+- The AWS name comes from the `name` attribute of the block. When it is absent, the app falls back to the label with `_` replaced by `-`. The exception is `aws_ssm_parameter`, which is skipped when `name` is missing.
 - Values must be literal strings. `var.*`, `local.*` and `${...}` interpolations are **not** resolved.
 - Any other attribute is ignored by the app and harmless to keep, so the same file still works with real Terraform.
 
@@ -307,6 +307,22 @@ resource "aws_elasticache_cluster" "nimbus_cache" {
 
 The parser only reads quoted values, so an unquoted `num_cache_nodes = 1` falls back to the default of a single node — write it as `num_cache_nodes = "2"` when a Memcached cluster needs more. `port` is never sent to the emulator: Redis answers on `6379` and Memcached on `11211`.
 
+#### SSM Parameter Store
+
+`name` is required for this type. A Terraform block label cannot contain a slash, so the usual fallback to the label would invent a wrong parameter name — a block without `name` is skipped by the app instead.
+
+```hcl
+resource "aws_ssm_parameter" "nimbus_db_host" {
+  name  = "/nimbus/db/host"
+  type  = "String"
+  value = "localhost"
+}
+```
+
+The app sends `name`, `value` and `type` to the emulator with `put-parameter --overwrite`, so creating a parameter that already exists replaces its value and bumps the version. A missing `value` is sent as an empty string and a missing `type` falls back to `String`.
+
+> ⚠️ A `SecureString` value written into a `.tf` file is a secret stored in plain text in your repository, and the Inspector shows it decrypted. Keep local debugging on `String`.
+
 #### What the app reads from each type
 
 | Terraform type | Attributes used | Created in the emulator as |
@@ -318,6 +334,7 @@ The parser only reads quoted values, so an unquoted `num_cache_nodes = 1` falls 
 | `aws_dynamodb_table` | `name` | Table with `id` (`S`) partition key, `PAY_PER_REQUEST` |
 | `aws_sfn_state_machine` | `name` | State machine with a single `Pass` state |
 | `aws_elasticache_cluster` | `cluster_id`, `engine`, `node_type`, `num_cache_nodes` (quoted) | Replication group (redis) or cache cluster (memcached) |
+| `aws_ssm_parameter` | `name` (required), `value`, `type` | Parameter written with `put-parameter --overwrite` |
 
 ### payloads.json
 

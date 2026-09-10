@@ -1,6 +1,6 @@
 ---
 name: aws-local-infra
-description: Create or repair the infra/ folder that AWS Local Manager reads, so the project can be debugged against a local AWS emulator. Use when the user wants to run or debug their service against local SQS, SNS, S3, DynamoDB, Step Functions or ElastiCache, mentions AWS Local Manager or Floci, or asks to create, fix or extend infra/, aws-local.config.json, the .tf templates or payloads.json.
+description: Create or repair the infra/ folder that AWS Local Manager reads, so the project can be debugged against a local AWS emulator. Use when the user wants to run or debug their service against local SQS, SNS, S3, DynamoDB, Step Functions, ElastiCache or SSM Parameter Store, mentions AWS Local Manager or Floci, or asks to create, fix or extend infra/, aws-local.config.json, the .tf templates or payloads.json.
 ---
 
 # AWS Local Manager infrastructure
@@ -40,10 +40,10 @@ Do not ask the user to list the queues and buckets. Read them from the project. 
 the real names already used by the application, then confirm the final list in one message.
 
 ```bash
-rg -n -i -e 'sqs|sns|s3|dynamo|stepfunction|sfn|elasticache|redis|memcached' \
+rg -n -i -e 'sqs|sns|s3|dynamo|stepfunction|sfn|elasticache|redis|memcached|ssm|parameter.?store' \
   --glob '!{build,target,dist,node_modules,.git,.gradle}/**' | head -50
 
-rg -n -i -e '(queue|topic|bucket|table|cluster)[_-]?(name|url|arn|id)?\s*[:=]' \
+rg -n -i -e '(queue|topic|bucket|table|cluster|parameter)[_-]?(name|url|arn|id|path)?\s*[:=]' \
   --glob '!{build,target,dist,node_modules,.git,.gradle}/**' | head -50
 ```
 
@@ -54,7 +54,7 @@ Good places to look, by stack:
 | Java / Kotlin | `@SqsListener`, `SqsClient`, `SnsClient`, `S3Client`, `DynamoDbClient`, `application*.yml` |
 | Node / TypeScript | `@aws-sdk/client-*`, `QueueUrl`, `TopicArn`, `Bucket`, `TableName` |
 | Python | `boto3.client("sqs")`, `queue_url`, `topic_arn`, `table_name` |
-| Any | `.env*`, `docker-compose*.yml`, Helm values, `*_QUEUE`, `*_TOPIC`, `*_BUCKET`, `*_TABLE` |
+| Any | `.env*`, `docker-compose*.yml`, Helm values, `*_QUEUE`, `*_TOPIC`, `*_BUCKET`, `*_TABLE`, `*_PARAMETER` |
 
 Use the names the application actually reads. A queue named in code as `orders-events` must
 be created as `orders-events`, otherwise the running service will not find it.
@@ -72,9 +72,9 @@ Only `name` is read. Unknown keys are ignored.
 ## Step 4: write the .tf files
 
 Group resources by kind, one file per kind: `queues.tf`, `topics.tf`, `buckets.tf`,
-`tables.tf`. Keep them minimal. Do **not** add `provider`, `backend`, `terraform`, IAM,
-tags, modules or variables. The parser resolves nothing: `var.*`, `local.*` and `${...}`
-are never expanded, so every value must be a literal string.
+`tables.tf`, `parameters.tf`. Keep them minimal. Do **not** add `provider`, `backend`,
+`terraform`, IAM, tags, modules or variables. The parser resolves nothing: `var.*`,
+`local.*` and `${...}` are never expanded, so every value must be a literal string.
 
 Block labels accept letters, digits and `_` only. No hyphens, no dots.
 
@@ -194,6 +194,25 @@ resource "aws_elasticache_cluster" "orders_cache" {
 }
 ```
 
+### SSM Parameter Store
+
+`name` is required here and is the only source of the parameter name: a block label cannot
+contain a slash, so a block without `name` is skipped. The app sends `name`, `value` and
+`type` with `put-parameter --overwrite`, so creating an existing parameter replaces its
+value.
+
+```hcl
+resource "aws_ssm_parameter" "orders_db_host" {
+  name  = "/orders/db/host"
+  type  = "String"
+  value = "localhost"
+}
+```
+
+A `SecureString` value written into a `.tf` file is a secret in plain text in the user's
+repository, and the Inspector shows it decrypted. Keep local debugging on `String` and
+never move a real secret into these files.
+
 ## Step 5: payloads.json (optional)
 
 Saved payloads for the Running screen. Every entry requires `name`, `queue` and `payload`.
@@ -239,6 +258,7 @@ Confirm each item:
 - At least one `resource "aws_..."` block exists, otherwise the project is invisible.
 - No block label contains `-` or `.`.
 - Every `aws_s3_bucket` label matches its `bucket` value, with `_` in place of `-`.
+- Every `aws_ssm_parameter` block has a `name`, otherwise the app skips it.
 - Every `.tf` file is directly in `infra/`, none in a subfolder.
 - Every `payloads.json` entry has `name`, `queue` and `payload`.
 - Resource names match the names the application code actually uses.
