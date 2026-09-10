@@ -3,6 +3,7 @@ package dev.lucascosta.awslocalmanager.constants
 object AppConstants {
     // General
     const val APP_NAME = "AWS Local Manager"
+    const val APP_ICON_RESOURCE = "icon.png"
     const val EMPTY_STRING = ""
     const val UNKNOWN = "unknown"
     const val USER_HOME = "user.home"
