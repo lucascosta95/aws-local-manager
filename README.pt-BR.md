@@ -129,6 +129,21 @@ Identifica o projeto dentro do app. Apenas `name` é obrigatório:
 }
 ```
 
+### Skill para agentes de IA
+
+Se você conduz o projeto com um agente de IA, instale a skill do repositório dentro do
+projeto que quer depurar. O agente lê o código, infere as filas, tópicos e buckets que já
+são usados e escreve o `infra/` com a estrutura correta:
+
+```bash
+mkdir -p .claude/skills/aws-local-infra && \
+curl -fsSL https://raw.githubusercontent.com/lucascosta95/aws-local-manager/main/skills/aws-local-infra/SKILL.md \
+  -o .claude/skills/aws-local-infra/SKILL.md
+```
+
+Depois peça algo como *"prepare este projeto para debug local da AWS"*. A skill é Markdown
+puro, então também funciona colada no `AGENTS.md` ou no prompt de qualquer outro assistente.
+
 ### Templates Terraform
 
 O app nunca executa `terraform apply`. Ele lê os arquivos `.tf` com um parser simples e chama o AWS CLI apontando para o emulador, então os arquivos podem ser bem enxutos — não é preciso `provider`, `backend`, IAM, variáveis ou módulos.

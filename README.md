@@ -129,6 +129,22 @@ Identifies the project inside the app. Only `name` is required:
 }
 ```
 
+### AI agent skill
+
+If you drive your project with an AI coding agent, install the bundled skill inside the
+project you want to debug. The agent then reads the code, infers the queues, topics and
+buckets it already uses, and writes `infra/` with the correct structure:
+
+```bash
+mkdir -p .claude/skills/aws-local-infra && \
+curl -fsSL https://raw.githubusercontent.com/lucascosta95/aws-local-manager/main/skills/aws-local-infra/SKILL.md \
+  -o .claude/skills/aws-local-infra/SKILL.md
+```
+
+Then ask it something like *"set up this project for local AWS debugging"*. The skill is
+plain Markdown, so it also works pasted into `AGENTS.md` or into the prompt of any other
+assistant.
+
 ### Terraform templates
 
 The app never runs `terraform apply`. It reads the `.tf` files with a lightweight parser and calls the AWS CLI against the emulator, so the files can stay minimal — no `provider`, `backend`, IAM, variables or modules are needed.
