@@ -42,6 +42,8 @@ import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import dev.lucascosta.awslocalmanager.theme.LocalAppColors
 import org.koin.compose.koinInject
@@ -114,6 +116,14 @@ fun QuickScreen(
                         onEngineChange = viewModel::setElastiCacheEngine,
                     )
 
+                SsmParameterResource ->
+                    SsmParameterOptions(
+                        value = state.parameterValue,
+                        type = state.parameterType,
+                        onValueChange = viewModel::setParameterValue,
+                        onTypeChange = viewModel::setParameterType,
+                    )
+
                 else -> {}
             }
 
@@ -121,7 +131,7 @@ fun QuickScreen(
 
             Button(
                 onClick = viewModel::create,
-                enabled = state.resourceName.isNotBlank() && !state.isCreating,
+                enabled = state.canCreate,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (state.isCreating) {
@@ -246,6 +256,36 @@ private fun ElastiCacheOptions(
                     selected = engine == e,
                     onClick = { onEngineChange(e) },
                     label = { Text(e.cliValue, style = MaterialTheme.typography.labelSmall) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SsmParameterOptions(
+    value: String,
+    type: SsmParameterType,
+    onValueChange: (String) -> Unit,
+    onTypeChange: (SsmParameterType) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val strings = LocalStrings.current
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(strings.quickParameterValue, style = MaterialTheme.typography.bodySmall) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(strings.quickParameterType, style = MaterialTheme.typography.labelMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SsmParameterType.entries.forEach { entry ->
+                FilterChip(
+                    selected = type == entry,
+                    onClick = { onTypeChange(entry) },
+                    label = { Text(entry.cliValue, style = MaterialTheme.typography.labelSmall) },
                 )
             }
         }

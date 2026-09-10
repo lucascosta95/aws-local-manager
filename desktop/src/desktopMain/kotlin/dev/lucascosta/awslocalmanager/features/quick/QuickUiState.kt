@@ -4,6 +4,8 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.EMPTY_STRING
 import dev.lucascosta.awslocalmanager.data.model.aws.AwsResourceDefinition
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
 
 data class QuickUiState(
     val selectedType: AwsResourceDefinition = SqsResource,
@@ -13,6 +15,14 @@ data class QuickUiState(
     val partitionKey: String = "id",
     val partitionKeyType: DynamoKeyType = DynamoKeyType.STRING,
     val elastiCacheEngine: ElastiCacheEngine = ElastiCacheEngine.REDIS,
+    val parameterValue: String = EMPTY_STRING,
+    val parameterType: SsmParameterType = SsmParameterType.STRING,
     val isCreating: Boolean = false,
     val history: List<QuickHistoryItem> = emptyList(),
-)
+) {
+    val canCreate: Boolean
+        get() =
+            resourceName.isNotBlank() &&
+                !isCreating &&
+                (selectedType != SsmParameterResource || parameterValue.isNotBlank())
+}

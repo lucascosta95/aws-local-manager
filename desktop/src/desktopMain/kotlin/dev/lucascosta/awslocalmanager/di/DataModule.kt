@@ -5,6 +5,7 @@ import dev.lucascosta.awslocalmanager.data.remote.AwsElastiCacheClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsS3Client
 import dev.lucascosta.awslocalmanager.data.remote.AwsSnsClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsSqsClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsSsmClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsStepFunctionsClient
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorClient
 import dev.lucascosta.awslocalmanager.data.repository.MessageRepository
@@ -55,6 +56,7 @@ val dataModule =
                 dynamoDbClientFactory = { endpoint -> AwsDynamoDbClient(endpoint) },
                 stepFunctionsClientFactory = { endpoint -> AwsStepFunctionsClient(endpoint) },
                 elastiCacheClientFactory = { endpoint -> AwsElastiCacheClient(endpoint) },
+                ssmClientFactory = { endpoint -> AwsSsmClient(endpoint) },
             )
         }
     }

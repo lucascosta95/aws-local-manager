@@ -16,10 +16,13 @@ import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
 import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
 import dev.lucascosta.awslocalmanager.data.remote.ElastiCacheCommands
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorDefaults
 import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
+import dev.lucascosta.awslocalmanager.data.remote.SsmCommands
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -72,9 +75,17 @@ class QuickViewModel(
         _state.update { it.copy(elastiCacheEngine = engine) }
     }
 
+    fun setParameterValue(value: String) {
+        _state.update { it.copy(parameterValue = value) }
+    }
+
+    fun setParameterType(type: SsmParameterType) {
+        _state.update { it.copy(parameterType = type) }
+    }
+
     fun create() {
         val currentState = _state.value
-        if (currentState.resourceName.isBlank() || currentState.isCreating) return
+        if (!currentState.canCreate) return
         scope.launch {
             val endpoint = preferencesRepository.preferences.first().endpoint
             _state.update { it.copy(isCreating = true) }
@@ -108,6 +119,7 @@ class QuickViewModel(
             S3Resource -> listOf(ResourceCreationResult(state.resourceName, runCommand(AwsCommands.createS3(state.resourceName), env)))
             DynamoDbResource -> listOf(ResourceCreationResult(state.resourceName, createDynamoDB(state, env)))
             ElastiCacheResource -> listOf(ResourceCreationResult(state.resourceName, createElastiCache(state, env)))
+            SsmParameterResource -> listOf(ResourceCreationResult(state.resourceName, createSsmParameter(state, env)))
             else -> listOf(ResourceCreationResult(state.resourceName, false))
         }
 
@@ -152,6 +164,15 @@ class QuickViewModel(
             }
         return runCommand(command, env)
     }
+
+    private suspend fun createSsmParameter(
+        state: QuickUiState,
+        env: Map<String, String>,
+    ): Boolean =
+        runCommand(
+            SsmCommands.putParameter(state.resourceName, state.parameterValue, state.parameterType.cliValue),
+            env,
+        )
 
     private suspend fun runCommand(
         command: List<String>,

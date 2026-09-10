@@ -10,5 +10,7 @@ object EmulatorDefaults {
 
     fun stepFunctionsArn(name: String) = "arn:aws:states:$AWS_REGION:$AWS_ACCOUNT_ID:stateMachine:$name"
 
+    fun ssmParameterArn(name: String) = "arn:aws:ssm:$AWS_REGION:$AWS_ACCOUNT_ID:parameter/${name.trimStart('/')}"
+
     fun iamRoleArn(roleName: String) = "arn:aws:iam::$AWS_ACCOUNT_ID:role/$roleName"
 }

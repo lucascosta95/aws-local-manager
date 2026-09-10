@@ -22,6 +22,13 @@ data class S3InspectorObject(
     val isPrefix: Boolean,
 )
 
+data class SsmInspectorParameter(
+    val name: String,
+    val type: String,
+    val value: String,
+    val version: Long,
+)
+
 sealed class InspectorDetail {
     data class SqsDetail(
         val messages: List<SqsInspectorMessage>,
@@ -45,6 +52,11 @@ sealed class InspectorDetail {
     data class S3Detail(
         val entries: List<S3InspectorObject>,
         val currentPrefix: String = "",
+    ) : InspectorDetail()
+
+    data class SsmDetail(
+        val path: String,
+        val parameters: List<SsmInspectorParameter>,
     ) : InspectorDetail()
 
     data class ElastiCacheDetail(
