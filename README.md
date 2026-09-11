@@ -54,6 +54,13 @@ docker pull floci/floci:2.0.1
 
 > The Setup screen checks all prerequisites on launch and can auto-fix most issues.
 
+The app looks for `docker`, `colima` and `aws` on `PATH` and, failing that, in the usual install
+locations (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.docker/bin`, `~/.rd/bin`, among others). This
+matters on macOS: an app launched from Finder is started by launchd with a bare
+`/usr/bin:/bin:/usr/sbin:/sbin` and never reads your shell profile, so a Homebrew install is
+invisible to it even though the same tools work in a terminal. The Logs screen records where each
+tool was found, or that it was not found at all.
+
 Each release is pinned to one emulator version. When you upgrade from a release that used an older
 one, Setup reports both the image and the emulator as **Outdated**: Docker keeps the old image and
 keeps serving it to the container already created from it, so a plain `docker pull` is not enough.

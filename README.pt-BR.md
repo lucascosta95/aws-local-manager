@@ -54,6 +54,13 @@ docker pull floci/floci:2.0.1
 
 > A tela de Setup verifica todos os pré-requisitos na inicialização e pode corrigir a maioria dos problemas com um clique.
 
+O app procura `docker`, `colima` e `aws` no `PATH` e, se não achar, nos lugares onde essas
+ferramentas costumam ser instaladas (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.docker/bin`,
+`~/.rd/bin`, entre outros). Isso importa no macOS: um app aberto pelo Finder é iniciado pelo launchd
+com um `PATH` de `/usr/bin:/bin:/usr/sbin:/sbin` e nunca lê o perfil do seu shell, então uma
+instalação via Homebrew fica invisível para ele mesmo que as mesmas ferramentas funcionem no
+terminal. A tela de Logs registra onde cada ferramenta foi encontrada, ou que não foi.
+
 Cada release é fixada em uma versão do emulador. Ao atualizar de uma release que usava outra, o Setup
 mostra a imagem e o emulador como **Desatualizado**: o Docker mantém a imagem antiga e continua
 servindo ela ao container já criado a partir dela, então um `docker pull` sozinho não resolve.

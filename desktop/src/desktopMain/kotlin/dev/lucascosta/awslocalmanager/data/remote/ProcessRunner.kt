@@ -18,6 +18,17 @@ import java.util.concurrent.TimeUnit
 
 object ProcessRunner {
     private const val LOG_SOURCE = "ProcessRunner"
+    private const val PATH_VARIABLE = "PATH"
+
+    /**
+     * Resolves the executable to an absolute path and hands the child the widened `PATH`. See
+     * [CommandLocator]: a packaged macOS app inherits launchd's bare `PATH`, not the shell's.
+     */
+    private fun ProcessBuilder.withResolvedEnvironment(): ProcessBuilder =
+        apply { environment()[PATH_VARIABLE] = CommandLocator.searchPath() }
+
+    private fun locate(command: List<String>): List<String> =
+        if (command.isEmpty()) command else listOf(CommandLocator.resolve(command.first())) + command.drop(1)
 
     fun awsEnvVars(endpoint: String): Map<String, String> =
         mapOf(
@@ -34,7 +45,8 @@ object ProcessRunner {
         withContext(Dispatchers.IO) {
             runCatching {
                 val process =
-                    ProcessBuilder(command)
+                    ProcessBuilder(locate(command))
+                        .withResolvedEnvironment()
                         .also { builder ->
                             if (config.workingDir != null) {
                                 builder.directory(config.workingDir)
@@ -89,7 +101,8 @@ object ProcessRunner {
         flow {
             val process =
                 try {
-                    ProcessBuilder(command)
+                    ProcessBuilder(locate(command))
+                        .withResolvedEnvironment()
                         .redirectErrorStream(true)
                         .also { builder ->
                             if (config.workingDir != null) {
