@@ -422,7 +422,19 @@ Build native packages:
 ./gradlew :desktop:packageDmg
 ```
 
-Output is placed in `desktop/build/compose/binaries/`.
+Output is placed in `desktop/build/compose/binaries/`. Each package has to be built on the system it
+targets, since `jpackage` only produces the format of the machine it runs on.
+
+The macOS bundle takes its icon from `desktop/icons/icon.icns`, because `jpackage` reads only
+`.icns` there and ignores a `.png` without reporting anything. After changing
+`desktop/src/desktopMain/resources/icon.png`, regenerate it on a Mac:
+
+```bash
+./scripts/generate_icns.sh
+```
+
+The `.dmg` build fails if that file is missing or is not a real `.icns`, rather than quietly
+shipping the default Java icon. Linux keeps using the `.png` directly, which `.deb` accepts.
 
 ---
 

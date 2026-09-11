@@ -422,7 +422,19 @@ Gerar pacotes nativos:
 ./gradlew :desktop:packageDmg
 ```
 
-Os arquivos gerados ficam em `desktop/build/compose/binaries/`.
+Os arquivos gerados ficam em `desktop/build/compose/binaries/`. Cada pacote precisa ser gerado no
+sistema de destino, porque o `jpackage` só produz o formato da máquina em que roda.
+
+O bundle do macOS tira o ícone de `desktop/icons/icon.icns`, porque o `jpackage` só lê `.icns` ali e
+ignora um `.png` sem avisar. Depois de trocar o `desktop/src/desktopMain/resources/icon.png`,
+regenere num Mac:
+
+```bash
+./scripts/generate_icns.sh
+```
+
+A geração do `.dmg` falha se esse arquivo sumir ou não for um `.icns` de verdade, em vez de entregar
+o ícone padrão do Java em silêncio. O Linux continua usando o `.png` direto, que o `.deb` aceita.
 
 ---
 

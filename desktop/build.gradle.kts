@@ -108,6 +108,22 @@ tasks.matching { it.name.endsWith("ProcessResources") }.configureEach {
     dependsOn(verifySkillCatalog)
 }
 
+/**
+ * jpackage falls back to the default Java icon without saying so, which is how the macOS build
+ * shipped with the wrong icon for several releases. Fail the packaging task instead.
+ */
+tasks.matching { it.name.contains("Dmg") }.configureEach {
+    doFirst {
+        val icns = project.file("icons/icon.icns")
+        if (!icns.isFile) {
+            error("Missing ${icns.path}. Run scripts/generate_icns.sh on macOS to build it from icon.png.")
+        }
+        if (icns.readBytes().take(4).toByteArray().toString(Charsets.US_ASCII) != "icns") {
+            error("${icns.path} is not a valid .icns file. Regenerate it with scripts/generate_icns.sh.")
+        }
+    }
+}
+
 compose.resources {
     publicResClass = false
     generateResClass = always
@@ -179,7 +195,11 @@ compose.desktop {
                 iconFile.set(project.file("src/desktopMain/resources/icon.png"))
             }
             macOS {
-                iconFile.set(project.file("src/desktopMain/resources/icon.png"))
+                // jpackage only reads .icns here. Pointing it at the .png is silently
+                // ignored and the bundle ships with the default Java icon, so the file
+                // lives outside the resources folder and is regenerated from icon.png
+                // by scripts/generate_icns.sh.
+                iconFile.set(project.file("icons/icon.icns"))
                 bundleID = "dev.lucascosta.awslocalmanager"
             }
         }
