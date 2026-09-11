@@ -26,6 +26,7 @@ data class LogsStrings(
     val logsCountFmt: String,
     val logsStackTraceHint: String,
     val logsCopyEntry: String,
+    val logsRepeatFmt: String,
 )
 
 val LogsStringsEnUs =
@@ -40,12 +41,13 @@ val LogsStringsEnUs =
         logsLevel = "Level",
         logsSource = "Source",
         logsClearFilters = "Clear filters",
-        logsAutoScroll = "Follow",
+        logsAutoScroll = "Tail",
         logsCopyAll = "Copy visible",
         logsClear = "Clear",
         logsCountFmt = "{visible} of {total}",
-        logsStackTraceHint = "click to see the stack trace",
+        logsStackTraceHint = "click the line to see the stack trace",
         logsCopyEntry = "Copy entry",
+        logsRepeatFmt = "repeated {count}x",
     )
 
 val LogsStringsPtBr =
@@ -64,6 +66,7 @@ val LogsStringsPtBr =
         logsCopyAll = "Copiar visíveis",
         logsClear = "Limpar",
         logsCountFmt = "{visible} de {total}",
-        logsStackTraceHint = "clique para ver o stack trace",
+        logsStackTraceHint = "clique na linha para ver o stack trace",
         logsCopyEntry = "Copiar entrada",
+        logsRepeatFmt = "repetiu {count}x",
     )

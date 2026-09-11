@@ -155,6 +155,10 @@ app discards it. Repeated identical entries collapse into one with a counter, wh
 failure from burying everything else. Filter by level, by source or by free text over the message
 and the stack trace, copy what is visible, or clear it.
 
+The list follows the newest entry only while you are standing at the bottom of it: scrolling up
+stops that, scrolling back down resumes it, and the Tail chip jumps to the end. Hovering a line
+reveals a button that copies that entry with its stack trace.
+
 The log panels already on the Infrastructure and Setup screens are unchanged; this is a separate
 view over everything at once.
 

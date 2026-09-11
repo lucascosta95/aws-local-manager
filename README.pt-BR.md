@@ -155,6 +155,10 @@ descarta tudo. Entradas idênticas em sequência viram uma só com um contador, 
 falha em polling soterre o resto. Dá para filtrar por nível, por origem ou por texto livre na
 mensagem e no stack trace, copiar o que está visível, ou limpar.
 
+A lista só acompanha a entrada mais nova enquanto você está no fim dela: subir o scroll interrompe,
+voltar ao fim retoma, e o chip Tail pula para o final. Passar o mouse numa linha revela um botão que
+copia aquela entrada junto com o stack trace.
+
 Os painéis de log que já existem nas telas de Infraestrutura e Setup continuam iguais; esta é uma
 visão separada sobre tudo de uma vez.
 

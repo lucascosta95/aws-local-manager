@@ -43,8 +43,8 @@ class LogsViewModel : BaseViewModel() {
         filters.value = LogFilters()
     }
 
-    fun toggleAutoScroll() {
-        autoScroll.update { !it }
+    fun setAutoScroll(enabled: Boolean) {
+        autoScroll.value = enabled
     }
 
     fun toggleExpanded(entryId: Long) {

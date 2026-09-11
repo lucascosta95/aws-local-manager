@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.VerticalAlignBottom
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -28,7 +30,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,7 +53,10 @@ fun LogsScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    Column(modifier = modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         LogsHeader(state = state, viewModel = viewModel)
         HorizontalDivider()
 
@@ -63,6 +72,7 @@ fun LogsScreen(
         LogList(
             state = state,
             onToggleExpanded = viewModel::toggleExpanded,
+            onAutoScrollChange = viewModel::setAutoScroll,
             modifier = Modifier.weight(1f),
         )
     }
@@ -76,12 +86,12 @@ private fun LogsHeader(
     val strings = LocalLogsStrings.current
     val clipboard = LocalClipboardManager.current
 
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(strings.logsTitle, style = MaterialTheme.typography.titleMedium)
             Text(
                 strings.logsSubtitle,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -96,8 +106,9 @@ private fun LogsHeader(
 
         FilterChip(
             selected = state.autoScroll,
-            onClick = viewModel::toggleAutoScroll,
+            onClick = { viewModel.setAutoScroll(!state.autoScroll) },
             label = { Text(strings.logsAutoScroll, style = MaterialTheme.typography.labelSmall) },
+            leadingIcon = { Icon(Icons.Outlined.VerticalAlignBottom, null, modifier = Modifier.size(14.dp)) },
         )
 
         OutlinedButton(
@@ -119,14 +130,39 @@ private fun LogsHeader(
 private fun LogList(
     state: LogsUiState,
     onToggleExpanded: (Long) -> Unit,
+    onAutoScrollChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val strings = LocalLogsStrings.current
     val listState = rememberLazyListState()
+    var followRequest by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(state.visible.size, state.autoScroll) {
-        if (state.autoScroll && state.visible.isNotEmpty()) {
-            listState.scrollToItem(state.visible.size - 1)
+    val isAtBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()
+            last == null || last.index >= info.totalItemsCount - 1
+        }
+    }
+
+    // Following the tail is a consequence of standing at the bottom, not a mode fighting the user:
+    // scrolling up stops it, scrolling back down resumes it.
+    LaunchedEffect(isAtBottom) {
+        onAutoScrollChange(isAtBottom)
+    }
+
+    // Pressing the chip while scrolled up is a request to jump back to the tail.
+    LaunchedEffect(state.autoScroll) {
+        if (state.autoScroll && !isAtBottom && state.visible.isNotEmpty()) {
+            followRequest++
+        }
+    }
+
+    // Standing at the bottom is enough on its own: the chip state arrives through the view model a
+    // beat later, and a new entry must not slip past while it catches up.
+    LaunchedEffect(state.visible.size, followRequest) {
+        if ((state.autoScroll || isAtBottom) && state.visible.isNotEmpty()) {
+            listState.scrollToItem(state.visible.lastIndex)
         }
     }
 
@@ -149,7 +185,7 @@ private fun LogList(
         } else {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().padding(end = 12.dp).padding(vertical = 8.dp),
+                modifier = Modifier.fillMaxSize().padding(end = 12.dp).padding(vertical = 6.dp),
             ) {
                 items(state.visible, key = { it.id }) { entry ->
                     LogRow(
@@ -159,9 +195,11 @@ private fun LogList(
                     )
                 }
             }
+            // fillMaxHeight, never fillMaxSize: a scrollbar stretched over the full width sits on
+            // top of the list and swallows every wheel and click meant for it.
             VerticalScrollbar(
                 adapter = rememberScrollbarAdapter(listState),
-                modifier = Modifier.align(Alignment.CenterEnd).fillMaxSize(),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
             )
         }
     }
