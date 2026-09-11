@@ -62,6 +62,7 @@ import dev.lucascosta.awslocalmanager.features.setup.SetupViewModel
 import dev.lucascosta.awslocalmanager.features.skills.SkillsViewModel
 import dev.lucascosta.awslocalmanager.features.update.UpdateViewModel
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
+import dev.lucascosta.awslocalmanager.i18n.LocalLanguage
 import dev.lucascosta.awslocalmanager.i18n.LocalSkillsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import dev.lucascosta.awslocalmanager.i18n.inspectorStringsForLanguage
@@ -155,6 +156,7 @@ fun AppRoot() {
     val updateAvailable by updateViewModel.updateAvailable.collectAsState()
 
     CompositionLocalProvider(
+        LocalLanguage provides prefs.language,
         LocalStrings provides stringsForLanguage(prefs.language),
         LocalInspectorStrings provides inspectorStringsForLanguage(prefs.language),
         LocalSkillsStrings provides skillsStringsForLanguage(prefs.language),

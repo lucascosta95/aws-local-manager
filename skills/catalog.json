@@ -18,7 +18,17 @@
         "elasticache",
         "stepfunctions",
         "ssm"
-      ]
+      ],
+      "translations": {
+        "pt-BR": {
+          "name": "Infraestrutura do AWS Local Manager",
+          "description": "Varre o projeto atrás dos serviços AWS que ele já usa, lendo o código, as configurações e os arquivos .env, e então cria ou conserta a pasta infra/ que o AWS Local Manager lê, para o projeto poder ser debugado contra o emulador local da AWS."
+        },
+        "en-US": {
+          "name": "AWS Local Manager infrastructure",
+          "description": "Sweeps the project for the AWS services it already uses, reading the code, the configuration and the .env files, then creates or repairs the infra/ folder that AWS Local Manager reads so the project can be debugged against the local AWS emulator."
+        }
+      }
     }
   ]
 }

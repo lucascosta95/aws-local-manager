@@ -102,7 +102,7 @@ class SkillsViewModel(
                     onFailure = { failed.add(target.displayName) },
                 )
             }
-            finish(entry, InstallFeedback(entry.name, installedPaths = installed, failedTargets = failed))
+            finish(entry, InstallFeedback(installedPaths = installed, failedTargets = failed))
         }
     }
 
@@ -114,9 +114,9 @@ class SkillsViewModel(
                 installer.uninstall(entry, target).fold(
                     onSuccess = { file ->
                         stateRepository.forget(entry.id, target.id)
-                        InstallFeedback(entry.name, removedPaths = listOf(file.absolutePath))
+                        InstallFeedback(removedPaths = listOf(file.absolutePath))
                     },
-                    onFailure = { InstallFeedback(entry.name, failedTargets = listOf(target.displayName)) },
+                    onFailure = { InstallFeedback(failedTargets = listOf(target.displayName)) },
                 )
             finish(entry, feedback)
         }

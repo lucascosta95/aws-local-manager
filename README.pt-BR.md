@@ -166,6 +166,11 @@ curl -fsSL https://raw.githubusercontent.com/lucascosta95/aws-local-manager/main
 A skill é Markdown puro com frontmatter `name` e `description`, então também funciona colada no
 `AGENTS.md` ou no prompt de qualquer outro assistente.
 
+A skill em si é escrita em inglês, porque é o que o agente lê. A tela em volta dela segue o idioma
+selecionado no app: cada entrada do `skills/catalog.json` tem um mapa `translations` com a tag de
+idioma como chave, e uma skill publicada sem tradução cai no `name` e `description` em inglês.
+O **Ver conteúdo** mostra sempre a skill como ela é instalada.
+
 ### Templates Terraform
 
 O app nunca executa `terraform apply`. Ele lê os arquivos `.tf` com um parser simples e chama o AWS CLI apontando para o emulador, então os arquivos podem ser bem enxutos — não é preciso `provider`, `backend`, IAM, variáveis ou módulos.

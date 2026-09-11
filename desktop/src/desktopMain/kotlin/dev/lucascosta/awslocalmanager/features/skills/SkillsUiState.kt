@@ -20,7 +20,6 @@ data class TargetStatus(
 }
 
 data class InstallFeedback(
-    val skillName: String,
     val installedPaths: List<String> = emptyList(),
     val removedPaths: List<String> = emptyList(),
     val failedTargets: List<String> = emptyList(),

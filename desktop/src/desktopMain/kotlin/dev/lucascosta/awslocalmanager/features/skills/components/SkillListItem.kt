@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.lucascosta.awslocalmanager.data.model.skill.SkillCatalogEntry
+import dev.lucascosta.awslocalmanager.i18n.LocalLanguage
 import dev.lucascosta.awslocalmanager.i18n.LocalSkillsStrings
 
 @Composable
@@ -23,6 +24,7 @@ internal fun SkillListItem(
     onClick: () -> Unit,
 ) {
     val strings = LocalSkillsStrings.current
+    val language = LocalLanguage.current
     val containerColor =
         if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
 
@@ -34,14 +36,14 @@ internal fun SkillListItem(
             modifier = Modifier.padding(12.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(entry.name, style = MaterialTheme.typography.titleSmall)
+            Text(entry.localizedName(language), style = MaterialTheme.typography.titleSmall)
             Text(
                 strings.skillsVersionFmt.replace("{version}", entry.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                entry.description,
+                entry.localizedDescription(language),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 3,
