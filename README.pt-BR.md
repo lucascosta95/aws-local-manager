@@ -54,6 +54,13 @@ docker pull floci/floci:2.0.1
 
 > A tela de Setup verifica todos os pré-requisitos na inicialização e pode corrigir a maioria dos problemas com um clique.
 
+Cada release é fixada em uma versão do emulador. Ao atualizar de uma release que usava outra, o Setup
+mostra a imagem e o emulador como **Desatualizado**: o Docker mantém a imagem antiga e continua
+servindo ela ao container já criado a partir dela, então um `docker pull` sozinho não resolve.
+Corrigir a verificação da imagem baixa a versão suportada, remove o container que o app criou com a
+imagem antiga, e apaga a imagem antiga. Corrigir a verificação do emulador recria o container na
+versão suportada. Tudo que for removido aparece no log da correção.
+
 ---
 
 ## 📦 Instalação

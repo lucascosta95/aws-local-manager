@@ -6,12 +6,14 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_READY_POLL_I
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_READY_POLL_MAX_ATTEMPTS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_RUN_FAILED_MSG
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_SOCKET_BINDING
+import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_UNTAGGED
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMPTY_STRING
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_CONTAINER_NAME
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_PORT_MAPPING
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_READY_POLL_MAX_ATTEMPTS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.FIX_SETTLE_DELAY_MS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.FLOCI_IMAGE
+import dev.lucascosta.awslocalmanager.constants.AppConstants.FLOCI_REPOSITORY
 import dev.lucascosta.awslocalmanager.constants.AppConstants.OS_MAC_IDENTIFIER
 import dev.lucascosta.awslocalmanager.constants.AppConstants.OS_NAME_PROPERTY
 import dev.lucascosta.awslocalmanager.data.model.health.CheckStatus
@@ -94,12 +96,17 @@ class SetupViewModel(
             PrerequisiteCheck(ID_AWS_CLI, EMPTY_STRING, CheckStatus.CHECKING, null, canAutoFix = false),
         )
 
+    /**
+     * A fix ends by re-running the checks with `resetAll = false`, and the log of what it did is
+     * the only record the user gets of a removed image or a recreated container, so it survives
+     * that pass and is cleared only when the checks are started again from scratch.
+     */
     private fun resetCheckStates(resetAll: Boolean) {
         _state.update { state ->
             state.copy(
                 isChecking = true,
                 allOk = false,
-                fixLogLines = emptyList(),
+                fixLogLines = if (resetAll) emptyList() else state.fixLogLines,
                 checks =
                     state.checks.map { check ->
                         if (resetAll || check.status != CheckStatus.OK) {
@@ -137,17 +144,15 @@ class SetupViewModel(
     }
 
     private suspend fun checkAndUpdateEmulatorImage(dockerRunning: Boolean): Boolean {
-        val present =
-            dockerRunning &&
-                checkCommandOutputNotEmpty(
-                    listOf("docker", "images", "-q", FLOCI_IMAGE),
-                )
+        val present = dockerRunning && isSupportedImagePresent()
+        val outdated = dockerRunning && outdatedImages().isNotEmpty()
 
         updateCheck(ID_EMULATOR_IMAGE) {
             it.copy(
                 status =
                     when {
                         !dockerRunning -> CheckStatus.UNKNOWN
+                        outdated -> CheckStatus.OUTDATED
                         present -> CheckStatus.OK
                         else -> CheckStatus.NOT_RUNNING
                     },
@@ -157,19 +162,58 @@ class SetupViewModel(
         return present
     }
 
+    private suspend fun isSupportedImagePresent(): Boolean = checkCommandOutputNotEmpty(listOf("docker", "images", "-q", FLOCI_IMAGE))
+
+    /**
+     * Every emulator image on the machine that is not the supported one. An upgrade leaves the
+     * previous release behind, and Docker keeps serving it to any container already created from
+     * it, so the app has to say so instead of reporting the image check as fine.
+     */
+    private suspend fun outdatedImages(): List<String> =
+        withContext(Dispatchers.IO) {
+            val listing =
+                ProcessRunner
+                    .run(listOf("docker", "images", "--format", "{{.Repository}}:{{.Tag}}", FLOCI_REPOSITORY))
+                    .getOrNull()
+                    ?.takeIf { it.exitCode == 0 }
+                    ?.stdout
+                    .orEmpty()
+            listing
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && it != FLOCI_IMAGE && !it.endsWith(":$DOCKER_UNTAGGED") }
+                .distinct()
+                .toList()
+        }
+
+    /** The image reference the emulator container was created from, or null when there is none. */
+    private suspend fun containerImage(): String? =
+        withContext(Dispatchers.IO) {
+            ProcessRunner
+                .run(listOf("docker", "inspect", "--format", "{{.Config.Image}}", EMULATOR_CONTAINER_NAME))
+                .getOrNull()
+                ?.takeIf { it.exitCode == 0 }
+                ?.stdout
+                ?.trim()
+                ?.ifBlank { null }
+        }
+
     private suspend fun checkAndUpdateEmulatorRunning(imagePresent: Boolean) {
         val endpoint = currentEndpoint()
-        val running = imagePresent && emulatorClient.isReachable(endpoint)
+        val createdFrom = containerImage()
+        val outdatedContainer = createdFrom != null && createdFrom != FLOCI_IMAGE
+        val running = imagePresent && !outdatedContainer && emulatorClient.isReachable(endpoint)
 
         updateCheck(ID_EMULATOR_RUNNING) {
             it.copy(
                 status =
                     when {
+                        outdatedContainer -> CheckStatus.OUTDATED
                         !imagePresent -> CheckStatus.UNKNOWN
                         running -> CheckStatus.OK
                         else -> CheckStatus.NOT_RUNNING
                     },
-                canAutoFix = imagePresent,
+                canAutoFix = imagePresent || outdatedContainer,
             )
         }
     }
@@ -189,16 +233,39 @@ class SetupViewModel(
             lastLine = processLine.text
         }
 
-        val imagePresent = checkCommandOutputNotEmpty(listOf("docker", "images", "-q", FLOCI_IMAGE))
-        if (!imagePresent) {
+        if (!isSupportedImagePresent()) {
             updateCheck(ID_EMULATOR_IMAGE) { it.copy(isFixing = false, status = CheckStatus.NOT_RUNNING, detail = lastLine) }
-        } else {
-            updateCheck(ID_EMULATOR_IMAGE) { it.copy(isFixing = false, status = CheckStatus.OK) }
+            return
+        }
+
+        removeOutdatedImages()
+        updateCheck(ID_EMULATOR_IMAGE) { it.copy(isFixing = false, status = CheckStatus.OK) }
+    }
+
+    /**
+     * Drops the emulator images left over from an earlier release, now that the supported one is on
+     * disk. Docker refuses to delete an image a container was created from, so the app's own
+     * container goes first when it is the one holding an outdated image. Anything else still using
+     * it is left alone and the reason is written to the fix log.
+     */
+    private suspend fun removeOutdatedImages() {
+        val outdated = outdatedImages()
+        if (outdated.isEmpty()) {
+            return
+        }
+        if (containerImage() in outdated) {
+            removeExistingContainerIfPresent()
+        }
+        outdated.forEach { image ->
+            appendFixLog("Removing outdated emulator image $image...")
+            val result = ProcessRunner.run(listOf("docker", "rmi", image)).getOrNull()
+            val output = listOfNotNull(result?.stdout, result?.stderr).filter { it.isNotBlank() }
+            output.forEach { appendFixLog(it) }
         }
     }
 
     private suspend fun fixEmulatorRunning(): Boolean {
-        val imagePresent = checkCommandOutputNotEmpty(listOf("docker", "images", "-q", FLOCI_IMAGE))
+        val imagePresent = isSupportedImagePresent()
         if (!imagePresent) {
             updateCheck(ID_EMULATOR_RUNNING) { it.copy(isFixing = false, status = CheckStatus.UNKNOWN) }
             return false

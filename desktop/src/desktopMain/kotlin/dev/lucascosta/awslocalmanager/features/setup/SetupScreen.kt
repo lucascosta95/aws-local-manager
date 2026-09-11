@@ -294,6 +294,7 @@ private fun resolveStatusLabel(
     check.detail ?: when (check.status) {
         CheckStatus.MISSING -> strings.setupStatusMissing
         CheckStatus.NOT_RUNNING -> resolveNotRunningLabel(check.id, strings)
+        CheckStatus.OUTDATED -> resolveOutdatedLabel(check.id, strings)
         CheckStatus.UNKNOWN -> strings.setupStatusUnknown
         CheckStatus.ERROR -> resolveErrorLabel(check.id, strings)
         else -> null
@@ -304,9 +305,19 @@ private fun resolveNotRunningLabel(
     strings: dev.lucascosta.awslocalmanager.i18n.Strings,
 ): String =
     when (checkId) {
-        "emulator_image" -> strings.emulatorImageNotFound
-        "emulator_running" -> strings.emulatorNotRunning
+        SetupViewModel.ID_EMULATOR_IMAGE -> strings.emulatorImageNotFound
+        SetupViewModel.ID_EMULATOR_RUNNING -> strings.emulatorNotRunning
         else -> strings.setupStatusNotRunning
+    }
+
+private fun resolveOutdatedLabel(
+    checkId: String,
+    strings: dev.lucascosta.awslocalmanager.i18n.Strings,
+): String =
+    when (checkId) {
+        SetupViewModel.ID_EMULATOR_IMAGE -> strings.emulatorImageOutdated
+        SetupViewModel.ID_EMULATOR_RUNNING -> strings.emulatorOutdated
+        else -> strings.setupStatusOutdated
     }
 
 private fun resolveErrorLabel(
@@ -314,6 +325,6 @@ private fun resolveErrorLabel(
     strings: dev.lucascosta.awslocalmanager.i18n.Strings,
 ): String =
     when (checkId) {
-        "emulator_running" -> strings.emulatorStartError
+        SetupViewModel.ID_EMULATOR_RUNNING -> strings.emulatorStartError
         else -> strings.setupStatusNotRunning
     }

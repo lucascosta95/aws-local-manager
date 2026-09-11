@@ -54,6 +54,13 @@ docker pull floci/floci:2.0.1
 
 > The Setup screen checks all prerequisites on launch and can auto-fix most issues.
 
+Each release is pinned to one emulator version. When you upgrade from a release that used an older
+one, Setup reports both the image and the emulator as **Outdated**: Docker keeps the old image and
+keeps serving it to the container already created from it, so a plain `docker pull` is not enough.
+Fixing the image check downloads the supported version, removes the container the app created from
+the old image, and deletes the old image. Fixing the emulator check then recreates the container on
+the supported version. Everything removed is named in the fix log.
+
 ---
 
 ## 📦 Installation
