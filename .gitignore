@@ -52,7 +52,9 @@ preferences.json
 
 # Logs
 *.log
-logs/
+# Anchored to the repository root: an unanchored logs/ also matched the
+# features/logs source package and silently kept it out of every commit.
+/logs/
 
 # Local environment
 local.properties

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -83,6 +84,7 @@ fun SideNav(
                 items =
                     listOf(
                         NavItem(Screen.Skills, Icons.Outlined.Extension) { strings.navSkills },
+                        NavItem(Screen.Logs, Icons.Outlined.Terminal) { strings.navLogs },
                         NavItem(Screen.Setup, Icons.Outlined.MonitorHeart) { strings.navSetup },
                         NavItem(Screen.Settings, Icons.Outlined.Settings) { strings.navSettings },
                     ),

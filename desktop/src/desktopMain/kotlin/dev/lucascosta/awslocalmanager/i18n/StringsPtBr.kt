@@ -14,6 +14,7 @@ val PtBrStrings =
         navProject = "Projetos",
         navQuick = "Criação Rápida",
         navSkills = "Skills",
+        navLogs = "Logs",
         topBarConnectionOnline = "Conectado",
         topBarConnectionOffline = "Desconectado",
         topBarRefresh = "Atualizar",

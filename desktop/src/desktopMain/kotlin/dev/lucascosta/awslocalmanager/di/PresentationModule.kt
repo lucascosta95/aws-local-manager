@@ -3,6 +3,7 @@ package dev.lucascosta.awslocalmanager.di
 import dev.lucascosta.awslocalmanager.features.dashboard.DashboardViewModel
 import dev.lucascosta.awslocalmanager.features.infrastructure.InfrastructureViewModel
 import dev.lucascosta.awslocalmanager.features.inspector.InspectorViewModel
+import dev.lucascosta.awslocalmanager.features.logs.LogsViewModel
 import dev.lucascosta.awslocalmanager.features.project.ProjectSelectorViewModel
 import dev.lucascosta.awslocalmanager.features.quick.QuickViewModel
 import dev.lucascosta.awslocalmanager.features.running.RunningViewModel
@@ -17,6 +18,7 @@ val presentationModule =
         single { DashboardViewModel(get(), get(), get()) }
         single { SettingsViewModel(get()) }
         single { SetupViewModel(get(), get()) }
+        single { LogsViewModel() }
         single { ProjectSelectorViewModel(get(), get(), get(), get()) }
         single { InfrastructureViewModel(get(), get(), get(), get()) }
         single {

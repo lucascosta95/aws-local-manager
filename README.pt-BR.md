@@ -136,6 +136,21 @@ Identifica o projeto dentro do app. Apenas `name` é obrigatório:
 }
 ```
 
+### Logs da sessão
+
+A entrada **Logs** na barra lateral mostra tudo que o app fez desde que abriu: cada comando externo
+executado com o código de saída, cada falha ao consultar a saúde do emulador, e cada exceção
+capturada, com o stack trace a um clique. É o único lugar onde essas exceções aparecem — no resto do
+app ele informa que algo falhou sem dizer o que foi lançado.
+
+O buffer vive em memória, é limitado a 2000 entradas e nunca é gravado em disco, então fechar o app
+descarta tudo. Entradas idênticas em sequência viram uma só com um contador, o que evita que uma
+falha em polling soterre o resto. Dá para filtrar por nível, por origem ou por texto livre na
+mensagem e no stack trace, copiar o que está visível, ou limpar.
+
+Os painéis de log que já existem nas telas de Infraestrutura e Setup continuam iguais; esta é uma
+visão separada sobre tudo de uma vez.
+
 ### Skill para agentes de IA
 
 A tela **Skills** instala a skill do repositório nas ferramentas de IA encontradas na sua pasta

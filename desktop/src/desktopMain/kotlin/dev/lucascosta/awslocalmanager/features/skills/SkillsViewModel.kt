@@ -8,6 +8,7 @@ import dev.lucascosta.awslocalmanager.data.model.skill.SkillCatalogEntry
 import dev.lucascosta.awslocalmanager.data.model.skill.SkillsState
 import dev.lucascosta.awslocalmanager.data.repository.SkillCatalogRepository
 import dev.lucascosta.awslocalmanager.data.repository.SkillStateRepository
+import dev.lucascosta.awslocalmanager.domain.AppLogger
 import dev.lucascosta.awslocalmanager.domain.SkillInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,10 @@ class SkillsViewModel(
     private val stateRepository: SkillStateRepository,
     private val installer: SkillInstaller,
 ) : BaseViewModel() {
+    private companion object {
+        const val LOG_SOURCE = "Skills"
+    }
+
     private val _state = MutableStateFlow(SkillsUiState())
     val state: StateFlow<SkillsUiState> = _state.asStateFlow()
 
@@ -86,7 +91,11 @@ class SkillsViewModel(
         val targets = _state.value.selectedTargets.mapNotNull { AgentTargetRegistry.byId(it) }
         _state.update { it.copy(showConfirmDialog = false, isInstalling = true, feedback = null, error = null) }
         scope.launch(Dispatchers.IO) {
-            val content = catalogRepository.loadContent(entry).getOrNull()
+            val content =
+                catalogRepository
+                    .loadContent(entry)
+                    .onFailure { AppLogger.error(LOG_SOURCE, "Could not load the content of ${entry.id}", it) }
+                    .getOrNull()
             if (content == null) {
                 _state.update { it.copy(isInstalling = false, error = "content-unavailable") }
                 return@launch
@@ -99,7 +108,10 @@ class SkillsViewModel(
                         stateRepository.record(InstalledSkill(entry.id, target.id, entry.version, file.absolutePath))
                         installed.add(file.absolutePath)
                     },
-                    onFailure = { failed.add(target.displayName) },
+                    onFailure = { failure ->
+                        AppLogger.error(LOG_SOURCE, "Could not install ${entry.id} into ${target.displayName}", failure)
+                        failed.add(target.displayName)
+                    },
                 )
             }
             finish(entry, InstallFeedback(installedPaths = installed, failedTargets = failed))
@@ -116,7 +128,10 @@ class SkillsViewModel(
                         stateRepository.forget(entry.id, target.id)
                         InstallFeedback(removedPaths = listOf(file.absolutePath))
                     },
-                    onFailure = { InstallFeedback(failedTargets = listOf(target.displayName)) },
+                    onFailure = { failure ->
+                        AppLogger.error(LOG_SOURCE, "Could not remove ${entry.id} from ${target.displayName}", failure)
+                        InstallFeedback(failedTargets = listOf(target.displayName))
+                    },
                 )
             finish(entry, feedback)
         }
@@ -127,7 +142,10 @@ class SkillsViewModel(
         scope.launch(Dispatchers.IO) {
             catalogRepository.loadContent(entry).fold(
                 onSuccess = { content -> _state.update { it.copy(previewContent = content) } },
-                onFailure = { _state.update { it.copy(error = "content-unavailable") } },
+                onFailure = { failure ->
+                    AppLogger.error(LOG_SOURCE, "Could not preview ${entry.id}", failure)
+                    _state.update { it.copy(error = "content-unavailable") }
+                },
             )
         }
     }

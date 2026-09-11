@@ -18,6 +18,7 @@ class TerraformReader {
     private val json = Json { ignoreUnknownKeys = true }
 
     companion object {
+        private const val LOG_SOURCE = "TerraformReader"
         private val resourcePattern = Regex("""resource\s+"(aws_\w+)"\s+"(\w+)"\s*\{""")
         private val namePattern = Regex("""^\s*name\s*=\s*"([^"]+)"""", RegexOption.MULTILINE)
         private val snsSubscriptionPattern = Regex("""resource\s+"aws_sns_topic_subscription"\s+"(\w+)"\s*\{""")
@@ -59,7 +60,7 @@ class TerraformReader {
 
         val config =
             runCatching { json.decodeFromString<ProjectConfig>(configFile.readText()) }
-                .onFailure { System.err.println("[TerraformReader] Failed to parse config ${configFile.path}: ${it.message}") }
+                .onFailure { AppLogger.warn(LOG_SOURCE, "Failed to parse config ${configFile.path}", it) }
                 .getOrNull()
 
         val resources = if (config != null) readResources(infraDir) else emptyList()

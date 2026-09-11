@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import dev.lucascosta.awslocalmanager.features.dashboard.DashboardScreen
 import dev.lucascosta.awslocalmanager.features.infrastructure.InfrastructureScreen
 import dev.lucascosta.awslocalmanager.features.inspector.InspectorScreen
+import dev.lucascosta.awslocalmanager.features.logs.LogsScreen
 import dev.lucascosta.awslocalmanager.features.project.ProjectSelectorScreen
 import dev.lucascosta.awslocalmanager.features.quick.QuickScreen
 import dev.lucascosta.awslocalmanager.features.running.RunningScreen
@@ -60,6 +61,7 @@ fun AppNavigation(
             Screen.Quick -> QuickScreen()
             Screen.Inspector -> InspectorScreen()
             Screen.Skills -> SkillsScreen()
+            Screen.Logs -> LogsScreen()
         }
     }
 }

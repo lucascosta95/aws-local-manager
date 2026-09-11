@@ -6,6 +6,7 @@ import dev.lucascosta.awslocalmanager.data.model.health.AppServiceStatus
 import dev.lucascosta.awslocalmanager.data.model.project.InfraProject
 import dev.lucascosta.awslocalmanager.data.model.project.ProjectRunningInfo
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
+import dev.lucascosta.awslocalmanager.domain.AppLogger
 import dev.lucascosta.awslocalmanager.domain.AwsResourceChecker
 import dev.lucascosta.awslocalmanager.domain.ServiceStatusChecker
 import dev.lucascosta.awslocalmanager.domain.TerraformReader
@@ -25,6 +26,10 @@ class ProjectSelectorViewModel(
     private val serviceStatusChecker: ServiceStatusChecker,
     private val resourceChecker: AwsResourceChecker,
 ) : BaseViewModel() {
+    private companion object {
+        const val LOG_SOURCE = "Projects"
+    }
+
     private val _state = MutableStateFlow(ProjectSelectorUiState())
     val state: StateFlow<ProjectSelectorUiState> = _state.asStateFlow()
 
@@ -59,6 +64,7 @@ class ProjectSelectorViewModel(
                 runCatching {
                     terraformReader.findProjects(File(dirPath))
                 }.getOrElse { exception ->
+                    AppLogger.error(LOG_SOURCE, "Could not scan projects in $dirPath", exception)
                     _state.update { state -> state.copy(isScanning = false, error = exception.message) }
                     return@launch
                 }

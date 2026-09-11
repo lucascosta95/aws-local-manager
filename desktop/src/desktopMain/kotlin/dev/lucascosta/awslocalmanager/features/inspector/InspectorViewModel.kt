@@ -3,6 +3,7 @@ package dev.lucascosta.awslocalmanager.features.inspector
 import dev.lucascosta.awslocalmanager.BaseViewModel
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorResource
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
+import dev.lucascosta.awslocalmanager.domain.AppLogger
 import dev.lucascosta.awslocalmanager.features.inspector.handler.InspectorHandlerRegistry
 import dev.lucascosta.awslocalmanager.features.inspector.handler.InspectorServiceHandler
 import kotlinx.coroutines.Job
@@ -21,6 +22,10 @@ import kotlin.time.Duration.Companion.seconds
 class InspectorViewModel(
     private val preferencesRepository: PreferencesRepository,
 ) : BaseViewModel() {
+    private companion object {
+        const val LOG_SOURCE = "Inspector"
+    }
+
     private val _state = MutableStateFlow(InspectorUiState())
     val state: StateFlow<InspectorUiState> = _state.asStateFlow()
 
@@ -100,6 +105,7 @@ class InspectorViewModel(
                     )
                 }
             }.onFailure { e ->
+                AppLogger.error(LOG_SOURCE, "Could not load sub detail", e)
                 _state.update { it.copy(isLoadingSubDetail = false, detailError = e.message) }
             }
         }
@@ -124,6 +130,7 @@ class InspectorViewModel(
                     )
                 }
             }.onFailure { e ->
+                AppLogger.error(LOG_SOURCE, "Could not load more items", e)
                 _state.update { it.copy(isLoadingSubDetail = false, detailError = e.message) }
             }
         }
@@ -141,6 +148,7 @@ class InspectorViewModel(
                     loadDetailFor(endpoint, resource)
                 }
                 .onFailure { e ->
+                    AppLogger.error(LOG_SOURCE, "Inspector action failed", e)
                     _state.update { it.copy(actionError = e.message) }
                 }
         }
@@ -170,6 +178,7 @@ class InspectorViewModel(
                     }
                 }
                 .onFailure { e ->
+                    AppLogger.error(LOG_SOURCE, "Could not list resources", e)
                     _state.update { it.copy(isLoadingResources = false, resourcesError = e.message) }
                 }
         }
@@ -186,6 +195,7 @@ class InspectorViewModel(
                 _state.update { it.copy(isLoadingDetail = false, detail = detail) }
             }
             .onFailure { e ->
+                AppLogger.error(LOG_SOURCE, "Could not load detail for ${resource.name}", e)
                 _state.update { it.copy(isLoadingDetail = false, detailError = e.message) }
             }
     }

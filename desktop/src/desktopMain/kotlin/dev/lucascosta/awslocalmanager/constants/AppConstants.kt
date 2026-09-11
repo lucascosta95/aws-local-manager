@@ -36,6 +36,10 @@ object AppConstants {
     const val EMULATOR_HEALTH_PATH = "/_floci/health"
     const val DOCKER_SOCKET_BINDING = "/var/run/docker.sock:/var/run/docker.sock"
 
+    // Session log
+    const val LOG_MAX_ENTRIES = 2000
+    const val LOG_TIME_PATTERN = "HH:mm:ss.SSS"
+
     // App data
     const val APP_DATA_DIR_NAME = ".aws-local-manager"
     const val DATASTORE_FILENAME = "preferences.preferences_pb"

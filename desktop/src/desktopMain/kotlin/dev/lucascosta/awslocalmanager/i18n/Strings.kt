@@ -28,6 +28,7 @@ data class Strings(
     val navProject: String,
     val navQuick: String,
     val navSkills: String,
+    val navLogs: String,
     val topBarConnectionOnline: String,
     val topBarConnectionOffline: String,
     val topBarRefresh: String,

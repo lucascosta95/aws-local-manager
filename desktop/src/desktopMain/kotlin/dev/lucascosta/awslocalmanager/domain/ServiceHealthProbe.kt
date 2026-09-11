@@ -18,6 +18,6 @@ internal suspend fun probeResources(list: suspend () -> List<*>): AppServiceStat
             if (list().isNotEmpty()) AppServiceStatus.ACTIVE else AppServiceStatus.AVAILABLE
         }
     } catch (e: Exception) {
-        System.err.println("[ServiceHealthProbe] Health check failed: ${e.message}")
+        AppLogger.warn("ServiceHealthProbe", "Health check failed", e)
         AppServiceStatus.ERROR
     }

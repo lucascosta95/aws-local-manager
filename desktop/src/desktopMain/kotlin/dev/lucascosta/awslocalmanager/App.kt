@@ -54,6 +54,7 @@ import dev.lucascosta.awslocalmanager.features.inspector.handler.S3InspectorHand
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SsmInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.StepFunctionsInspectorHandler
+import dev.lucascosta.awslocalmanager.features.logs.LogsViewModel
 import dev.lucascosta.awslocalmanager.features.project.ProjectSelectorViewModel
 import dev.lucascosta.awslocalmanager.features.quick.QuickViewModel
 import dev.lucascosta.awslocalmanager.features.running.RunningViewModel
@@ -63,9 +64,11 @@ import dev.lucascosta.awslocalmanager.features.skills.SkillsViewModel
 import dev.lucascosta.awslocalmanager.features.update.UpdateViewModel
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalLanguage
+import dev.lucascosta.awslocalmanager.i18n.LocalLogsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalSkillsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import dev.lucascosta.awslocalmanager.i18n.inspectorStringsForLanguage
+import dev.lucascosta.awslocalmanager.i18n.logsStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.skillsStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.stringsForLanguage
 import dev.lucascosta.awslocalmanager.navigation.AppNavigation
@@ -142,6 +145,7 @@ fun AppRoot() {
             koinInject<QuickViewModel>(),
             koinInject<InspectorViewModel>(),
             koinInject<SkillsViewModel>(),
+            koinInject<LogsViewModel>(),
             updateViewModel,
         )
 
@@ -160,6 +164,7 @@ fun AppRoot() {
         LocalStrings provides stringsForLanguage(prefs.language),
         LocalInspectorStrings provides inspectorStringsForLanguage(prefs.language),
         LocalSkillsStrings provides skillsStringsForLanguage(prefs.language),
+        LocalLogsStrings provides logsStringsForLanguage(prefs.language),
     ) {
         DesktopAppTheme(appTheme = prefs.theme) {
             AppContent(

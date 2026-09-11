@@ -6,6 +6,7 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.HTTP_REQUEST_TIMEOU
 import dev.lucascosta.awslocalmanager.data.model.aws.AwsService
 import dev.lucascosta.awslocalmanager.data.model.health.HealthResponse
 import dev.lucascosta.awslocalmanager.data.model.health.ServiceStatus
+import dev.lucascosta.awslocalmanager.domain.AppLogger
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -16,6 +17,10 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 class EmulatorClient {
+    private companion object {
+        const val LOG_SOURCE = "Emulator"
+    }
+
     private val httpClient =
         HttpClient(CIO) {
             install(ContentNegotiation) {
@@ -53,6 +58,7 @@ class EmulatorClient {
 
         if (result.isSuccess) return result
 
+        AppLogger.warn(LOG_SOURCE, "Could not read health from $endpoint$EMULATOR_HEALTH_PATH", result.exceptionOrNull())
         return Result.failure(
             Exception("Could not reach emulator at $endpoint", result.exceptionOrNull()),
         )

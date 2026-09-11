@@ -136,6 +136,21 @@ Identifies the project inside the app. Only `name` is required:
 }
 ```
 
+### Session logs
+
+The **Logs** entry in the side bar shows everything the app did since it started: every external
+command it ran with its exit code, every emulator health failure, and every exception it caught,
+with the stack trace one click away. It is the only place those exceptions surface — elsewhere the
+app reports that something failed without saying what threw.
+
+The buffer lives in memory, is capped at 2000 entries and is never written to disk, so closing the
+app discards it. Repeated identical entries collapse into one with a counter, which keeps a polling
+failure from burying everything else. Filter by level, by source or by free text over the message
+and the stack trace, copy what is visible, or clear it.
+
+The log panels already on the Infrastructure and Setup screens are unchanged; this is a separate
+view over everything at once.
+
 ### AI agent skill
 
 The **Skills** screen installs the bundled skill into the AI coding tools found in your home
