@@ -23,12 +23,6 @@ data class CatalogResult(
     val source: CatalogSource,
 )
 
-/**
- * Serves the skill catalog and the skill content.
- *
- * Both are bundled inside the application, so everything works offline. The remote copy is
- * consulted first, which is what allows new skills to be published without a new release.
- */
 class SkillCatalogRepository {
     private val httpClient =
         HttpClient(CIO) {

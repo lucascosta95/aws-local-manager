@@ -11,7 +11,6 @@ private val TIME_FORMATTER: DateTimeFormatter =
 
 internal fun AppLogEntry.formattedTime(): String = TIME_FORMATTER.format(Instant.ofEpochMilli(timestamp))
 
-/** One entry as it is copied to the clipboard, stack trace included. */
 internal fun AppLogEntry.asPlainText(): String =
     buildString {
         append("${formattedTime()} ${level.name.padEnd(5)} [$source] $message")

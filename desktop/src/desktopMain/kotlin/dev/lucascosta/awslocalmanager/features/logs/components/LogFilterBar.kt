@@ -26,13 +26,6 @@ import dev.lucascosta.awslocalmanager.data.model.log.LogLevel
 import dev.lucascosta.awslocalmanager.features.logs.LogFilters
 import dev.lucascosta.awslocalmanager.i18n.LocalLogsStrings
 
-/**
- * Search and chips above the list.
- *
- * The source list grows as new parts of the app log for the first time, so the chips scroll
- * sideways in a fixed-height row instead of wrapping: a wrapping row kept stealing height from the
- * list itself, which is the part worth showing.
- */
 @Composable
 internal fun LogFilterBar(
     filters: LogFilters,

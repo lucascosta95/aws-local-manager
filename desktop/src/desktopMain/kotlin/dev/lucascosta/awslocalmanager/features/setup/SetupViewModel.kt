@@ -96,11 +96,6 @@ class SetupViewModel(
             PrerequisiteCheck(ID_AWS_CLI, EMPTY_STRING, CheckStatus.CHECKING, null, canAutoFix = false),
         )
 
-    /**
-     * A fix ends by re-running the checks with `resetAll = false`, and the log of what it did is
-     * the only record the user gets of a removed image or a recreated container, so it survives
-     * that pass and is cleared only when the checks are started again from scratch.
-     */
     private fun resetCheckStates(resetAll: Boolean) {
         _state.update { state ->
             state.copy(
@@ -164,11 +159,6 @@ class SetupViewModel(
 
     private suspend fun isSupportedImagePresent(): Boolean = checkCommandOutputNotEmpty(listOf("docker", "images", "-q", FLOCI_IMAGE))
 
-    /**
-     * Every emulator image on the machine that is not the supported one. An upgrade leaves the
-     * previous release behind, and Docker keeps serving it to any container already created from
-     * it, so the app has to say so instead of reporting the image check as fine.
-     */
     private suspend fun outdatedImages(): List<String> =
         withContext(Dispatchers.IO) {
             val listing =
@@ -186,7 +176,6 @@ class SetupViewModel(
                 .toList()
         }
 
-    /** The image reference the emulator container was created from, or null when there is none. */
     private suspend fun containerImage(): String? =
         withContext(Dispatchers.IO) {
             ProcessRunner
@@ -242,12 +231,6 @@ class SetupViewModel(
         updateCheck(ID_EMULATOR_IMAGE) { it.copy(isFixing = false, status = CheckStatus.OK) }
     }
 
-    /**
-     * Drops the emulator images left over from an earlier release, now that the supported one is on
-     * disk. Docker refuses to delete an image a container was created from, so the app's own
-     * container goes first when it is the one holding an outdated image. Anything else still using
-     * it is left alone and the reason is written to the fix log.
-     */
     private suspend fun removeOutdatedImages() {
         val outdated = outdatedImages()
         if (outdated.isEmpty()) {

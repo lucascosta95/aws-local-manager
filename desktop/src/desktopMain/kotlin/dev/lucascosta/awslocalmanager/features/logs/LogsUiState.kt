@@ -3,12 +3,6 @@ package dev.lucascosta.awslocalmanager.features.logs
 import dev.lucascosta.awslocalmanager.data.model.log.AppLogEntry
 import dev.lucascosta.awslocalmanager.data.model.log.LogLevel
 
-/**
- * What the Logs screen is showing.
- *
- * An empty [levels] or [sources] means no filtering on that axis rather than nothing selected, so
- * the screen opens showing everything and narrows only once the user asks for it.
- */
 data class LogFilters(
     val levels: Set<LogLevel> = emptySet(),
     val sources: Set<String> = emptySet(),

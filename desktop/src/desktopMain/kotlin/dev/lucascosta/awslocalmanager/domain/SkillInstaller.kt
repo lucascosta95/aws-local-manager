@@ -10,17 +10,6 @@ import dev.lucascosta.awslocalmanager.data.model.skill.LegacyInstallMode
 import dev.lucascosta.awslocalmanager.data.model.skill.SkillCatalogEntry
 import java.io.File
 
-/**
- * Writes skills into the agent tools installed for the current user.
- *
- * Every target gets the same thing: a `<skill id>/SKILL.md` folder under the tool's own skills
- * directory, with the frontmatter left intact, so the tool lists it as a skill the user calls on
- * demand instead of loading it into every conversation.
- *
- * Everything it touches lives under the user home. Releases up to 1.2.0 wrote a Cursor rule file
- * and appended a block to the shared `AGENTS.md` / `GEMINI.md`, so installing now also removes
- * whatever those releases left behind.
- */
 class SkillInstaller(
     private val homeDir: File = File(System.getProperty(USER_HOME) ?: EMPTY_STRING),
 ) {
@@ -45,7 +34,6 @@ class SkillInstaller(
         target: AgentTarget,
     ): File = File(homeDir, "${target.skillsPath}/${entry.id}/$SKILL_MANIFEST_FILENAME")
 
-    /** How the user calls the skill once it is installed, for example `/aws-local-infra`. */
     fun invocation(
         entry: SkillCatalogEntry,
         target: AgentTarget,
@@ -56,10 +44,6 @@ class SkillInstaller(
         target: AgentTarget,
     ): Boolean = installPath(entry, target).isFile
 
-    /**
-     * The file an older release left behind for this skill, or null when there is nothing to clean
-     * up. Installing or removing the skill deletes it.
-     */
     fun legacyInstall(
         entry: SkillCatalogEntry,
         target: AgentTarget,
@@ -100,10 +84,6 @@ class SkillInstaller(
             file
         }
 
-    /**
-     * Returns the skill exactly as published, adding frontmatter only when the published file has
-     * none. Without a `name` and a `description` the tools do not list the skill at all.
-     */
     private fun manifest(
         entry: SkillCatalogEntry,
         content: String,

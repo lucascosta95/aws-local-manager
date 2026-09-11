@@ -9,17 +9,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.concurrent.atomic.AtomicLong
 
-/**
- * Collects everything the app has to say about what it is doing, for the Logs screen.
- *
- * The buffer lives in memory for the length of the session and nothing is written to disk, so
- * closing the app discards it. It is capped at [LOG_MAX_ENTRIES] and drops the oldest entries
- * first, which keeps a long session from growing without bound.
- *
- * This is an object rather than an injected dependency because the places worth logging from are
- * themselves objects, [dev.lucascosta.awslocalmanager.data.remote.ProcessRunner] above all, and
- * threading a logger through them would buy nothing.
- */
 object AppLogger {
     private val nextId = AtomicLong()
     private val _entries = MutableStateFlow<List<AppLogEntry>>(emptyList())

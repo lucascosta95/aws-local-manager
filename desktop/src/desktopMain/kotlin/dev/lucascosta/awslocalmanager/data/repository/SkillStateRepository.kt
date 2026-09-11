@@ -11,7 +11,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
-/** Tracks which skills are installed, in which tool and at which version. */
 class SkillStateRepository {
     private val json =
         Json {

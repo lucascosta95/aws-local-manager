@@ -6,7 +6,6 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.PORTUGUESE
 
 val LocalStrings = compositionLocalOf<Strings> { PtBrStrings }
 
-/** The language tag in use, for text that is translated in data instead of in [Strings]. */
 val LocalLanguage = compositionLocalOf { PORTUGUESE }
 
 fun stringsForLanguage(tag: String): Strings =

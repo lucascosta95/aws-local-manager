@@ -36,7 +36,6 @@ class LogsViewModel : BaseViewModel() {
         filters.update { it.copy(query = query) }
     }
 
-    /** The whole visible log as text, built when the copy button is pressed. */
     fun visibleAsText(): String = state.value.visible.joinToString("\n") { it.asPlainText() }
 
     fun clearFilters() {

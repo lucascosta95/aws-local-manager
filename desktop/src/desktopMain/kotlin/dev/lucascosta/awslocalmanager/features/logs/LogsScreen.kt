@@ -145,21 +145,16 @@ private fun LogList(
         }
     }
 
-    // Following the tail is a consequence of standing at the bottom, not a mode fighting the user:
-    // scrolling up stops it, scrolling back down resumes it.
     LaunchedEffect(isAtBottom) {
         onAutoScrollChange(isAtBottom)
     }
 
-    // Pressing the chip while scrolled up is a request to jump back to the tail.
     LaunchedEffect(state.autoScroll) {
         if (state.autoScroll && !isAtBottom && state.visible.isNotEmpty()) {
             followRequest++
         }
     }
 
-    // Standing at the bottom is enough on its own: the chip state arrives through the view model a
-    // beat later, and a new entry must not slip past while it catches up.
     LaunchedEffect(state.visible.size, followRequest) {
         if ((state.autoScroll || isAtBottom) && state.visible.isNotEmpty()) {
             listState.scrollToItem(state.visible.lastIndex)
@@ -195,8 +190,7 @@ private fun LogList(
                     )
                 }
             }
-            // fillMaxHeight, never fillMaxSize: a scrollbar stretched over the full width sits on
-            // top of the list and swallows every wheel and click meant for it.
+            // fillMaxHeight, never fillMaxSize: it would cover the list and swallow its clicks.
             VerticalScrollbar(
                 adapter = rememberScrollbarAdapter(listState),
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),

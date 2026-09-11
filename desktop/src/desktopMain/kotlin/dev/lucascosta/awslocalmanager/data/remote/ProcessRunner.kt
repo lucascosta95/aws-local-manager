@@ -20,10 +20,6 @@ object ProcessRunner {
     private const val LOG_SOURCE = "ProcessRunner"
     private const val PATH_VARIABLE = "PATH"
 
-    /**
-     * Resolves the executable to an absolute path and hands the child the widened `PATH`. See
-     * [CommandLocator]: a packaged macOS app inherits launchd's bare `PATH`, not the shell's.
-     */
     private fun ProcessBuilder.withResolvedEnvironment(): ProcessBuilder =
         apply { environment()[PATH_VARIABLE] = CommandLocator.searchPath() }
 
@@ -77,10 +73,6 @@ object ProcessRunner {
                 .onFailure { failure -> AppLogger.error(LOG_SOURCE, "${command.joinToString(" ")} could not run", failure) }
         }
 
-    /**
-     * A non-zero exit is not always a fault: several checks run a command precisely to see it fail,
-     * so it is a warning carrying the command's own error output, and a clean run stays at debug.
-     */
     private fun logOutcome(
         command: List<String>,
         output: ProcessOutput,

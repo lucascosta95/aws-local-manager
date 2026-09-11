@@ -91,7 +91,6 @@ internal fun LogRow(
                     maxLines = 1,
                 )
             }
-            // Reserved so the row keeps its width whether or not the pointer is over it.
             Box(modifier = Modifier.size(ACTION_COLUMN), contentAlignment = Alignment.Center) {
                 if (isHovered) {
                     CopyButton(textToCopy = entry.asPlainText(), contentDescription = strings.logsCopyEntry)
