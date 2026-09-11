@@ -167,9 +167,11 @@ class SkillsViewModel(
                 isDetected = installer.isDetected(target),
                 installedVersion = recorded?.version?.takeIf { stillOnDisk },
                 path = installer.installPath(entry, target).absolutePath,
+                invocation = installer.invocation(entry, target),
+                legacyPath = installer.legacyInstall(entry, target)?.absolutePath,
             )
         }
 
     private fun defaultSelection(targets: List<TargetStatus>): Set<String> =
-        targets.filter { it.isDetected && !it.isInstalled }.map { it.target.id }.toSet()
+        targets.filter { (it.isDetected || it.hasLegacyInstall) && !it.isInstalled }.map { it.target.id }.toSet()
 }

@@ -1,6 +1,6 @@
 ---
 name: aws-local-infra
-description: Create or repair the infra/ folder that AWS Local Manager reads, so the project can be debugged against a local AWS emulator. Use when the user wants to run or debug their service against local SQS, SNS, S3, DynamoDB, Step Functions, ElastiCache or SSM Parameter Store, mentions AWS Local Manager or Floci, or asks to create, fix or extend infra/, aws-local.config.json, the .tf templates or payloads.json.
+description: Sweep the open project for the AWS services it already uses, reading its code, configuration and .env files, then create or repair the infra/ folder that AWS Local Manager reads so the project can be debugged against a local AWS emulator. Use when the user wants to run or debug their service against local SQS, SNS, S3, DynamoDB, Step Functions, ElastiCache or SSM Parameter Store, mentions AWS Local Manager or Floci, or asks to create, fix or extend infra/, aws-local.config.json, the .tf templates or payloads.json.
 ---
 
 # AWS Local Manager infrastructure
@@ -9,7 +9,9 @@ AWS Local Manager is a desktop app that reads `.tf` files from a project and pro
 the resources into a local AWS emulator through the AWS CLI. It never runs
 `terraform apply`, so the files it reads are deliberately minimal.
 
-This skill sets up the folder that app expects, inside the user's own project.
+This skill sets up the folder that app expects, inside the user's own project. Call it from the
+project you want to debug: it sweeps that project for the AWS services the code already talks to
+and writes `infra/` from what it finds, instead of asking the user to type the names.
 
 ## Discovery rules that must not be broken
 
@@ -34,18 +36,49 @@ what is there and extend it instead of overwriting.
 Tell the user the absolute path of the project's **parent** directory at the end, because
 that is the value they must set in Settings → Projects Directory.
 
-## Step 2: infer the resources from the code
+## Step 2: sweep the project for the AWS services it uses
 
-Do not ask the user to list the queues and buckets. Read them from the project. Search for
-the real names already used by the application, then confirm the final list in one message.
+Do not ask the user which queues and buckets to create. Read them from the project. The names have
+to be the ones the running application already asks for, otherwise the service starts and finds
+nothing.
+
+### 2.1 Read the configuration first
+
+Configuration holds the real names more often than the source does. List what exists, then **open
+and read** the files, do not only grep them.
 
 ```bash
-rg -n -i -e 'sqs|sns|s3|dynamo|stepfunction|sfn|elasticache|redis|memcached|ssm|parameter.?store' \
-  --glob '!{build,target,dist,node_modules,.git,.gradle}/**' | head -50
-
-rg -n -i -e '(queue|topic|bucket|table|cluster|parameter)[_-]?(name|url|arn|id|path)?\s*[:=]' \
-  --glob '!{build,target,dist,node_modules,.git,.gradle}/**' | head -50
+find . -maxdepth 4 -type f \
+  \( -name '.env*' -o -name 'application*.y*ml' -o -name 'application*.properties' \
+     -o -name 'docker-compose*.y*ml' -o -name 'serverless.y*ml' -o -name 'template.y*ml' \
+     -o -name 'appsettings*.json' -o -name 'settings.py' -o -name '*.tf' \) \
+  -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' -not -path '*/dist/*'
 ```
+
+`.env` files are listed in `.gitignore` almost everywhere, and `rg` skips ignored files by default,
+so a plain `rg` sweep never sees them. Read them with `cat`, and pass `--no-ignore --hidden` to any
+`rg` command. Take the resource names out of them and nothing else: a password, token or access key
+read here never goes into `infra/`.
+
+### 2.2 Sweep the source
+
+```bash
+rg -n -i --no-ignore --hidden -g '!{.git,node_modules,build,target,dist,.gradle,vendor}/**' \
+  -e 'sqs|sns|s3|dynamo|stepfunction|sfn|state.?machine|elasticache|redis|memcached|ssm|parameter.?store|localstack'
+
+rg -n -i --no-ignore --hidden -g '!{.git,node_modules,build,target,dist,.gradle,vendor}/**' \
+  -e '(queue|topic|bucket|table|cluster|parameter)[_-]?(name|url|arn|id|path)?\s*[:=]'
+```
+
+`rg` is not installed everywhere. `grep` takes the same patterns:
+
+```bash
+grep -rIn -E -i 'sqs|sns|s3|dynamo|sfn|elasticache|redis|memcached|ssm' . \
+  --exclude-dir={.git,node_modules,build,target,dist,.gradle,vendor}
+```
+
+Read the whole output. Do not pipe it through `head`: the resource that gets cut off is the one
+the user notices missing. Narrow the pattern per service instead when a project is large.
 
 Good places to look, by stack:
 
@@ -54,10 +87,39 @@ Good places to look, by stack:
 | Java / Kotlin | `@SqsListener`, `SqsClient`, `SnsClient`, `S3Client`, `DynamoDbClient`, `application*.yml` |
 | Node / TypeScript | `@aws-sdk/client-*`, `QueueUrl`, `TopicArn`, `Bucket`, `TableName` |
 | Python | `boto3.client("sqs")`, `queue_url`, `topic_arn`, `table_name` |
-| Any | `.env*`, `docker-compose*.yml`, Helm values, `*_QUEUE`, `*_TOPIC`, `*_BUCKET`, `*_TABLE`, `*_PARAMETER` |
+| Go | `sqs.New`, `sns.New`, `s3.New`, `dynamodb.New`, `QueueUrl`, `TableName` |
+| .NET | `IAmazonSQS`, `IAmazonS3`, `appsettings*.json` |
+| Any | `.env*`, `docker-compose*.yml`, `serverless.yml`, `template.yaml`, Helm values, `*_QUEUE`, `*_TOPIC`, `*_BUCKET`, `*_TABLE`, `*_PARAMETER` |
 
-Use the names the application actually reads. A queue named in code as `orders-events` must
-be created as `orders-events`, otherwise the running service will not find it.
+An existing `terraform/` folder, a `serverless.yml` or a SAM `template.yaml` is the best source of
+all: it is the real deployed infrastructure. Take the names from it, but do not copy the files into
+`infra/` — the app's parser reads none of that, and Step 4 explains what it does read.
+
+### 2.3 Turn the findings into a resource list
+
+| What you found | What to create |
+|---|---|
+| `SqsClient`, `@SqsListener`, `QueueUrl`, `*_QUEUE*` | `aws_sqs_queue` |
+| a queue named `*-dlq`, or a `redrive_policy` | a second `aws_sqs_queue` |
+| `SnsClient`, `TopicArn`, `*_TOPIC*` | `aws_sns_topic` |
+| a topic that fans out into a queue the app consumes | `aws_sns_topic_subscription` |
+| `S3Client`, `Bucket`, `*_BUCKET*` | `aws_s3_bucket` |
+| `DynamoDbClient`, `TableName`, `*_TABLE*` | `aws_dynamodb_table` |
+| `sfn`, `StateMachineArn`, `startExecution` | `aws_sfn_state_machine` |
+| `redis`, `memcached`, a Lettuce / Jedis / ioredis client | `aws_elasticache_cluster` |
+| `ssm`, `getParameter`, a `/path/like/this` config key | `aws_ssm_parameter` |
+
+Only the seven types above exist in AWS Local Manager. When the project uses something else, such
+as Kinesis, EventBridge or Secrets Manager, say so plainly and leave it out instead of inventing a
+resource the app cannot create.
+
+When a name is assembled at runtime, as in `QUEUE=${ENV}-orders`, resolve it with the values the
+local profile uses and create the resolved name. State the assumption when you confirm the list.
+
+### 2.4 Confirm before writing
+
+Send one message with the resources you are about to create, each with the file and line the name
+came from. Write the files after the user agrees.
 
 ## Step 3: write aws-local.config.json
 

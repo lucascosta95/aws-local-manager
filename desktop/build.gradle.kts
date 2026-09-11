@@ -1,7 +1,7 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.security.MessageDigest
 
-val appVersion = "1.2.0"
+val appVersion = "1.3.0"
 val githubOwner = "lucascosta95"
 val githubRepo = "aws-local-manager"
 

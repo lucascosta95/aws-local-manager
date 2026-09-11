@@ -132,22 +132,30 @@ Identifica o projeto dentro do app. Apenas `name` é obrigatório:
 ### Skill para agentes de IA
 
 A tela **Skills** instala a skill do repositório nas ferramentas de IA encontradas na sua pasta
-pessoal. O agente então lê o projeto, infere as filas, tópicos e buckets que já são usados e
-escreve o `infra/` com a estrutura correta.
+pessoal. Depois você abre qualquer projeto na ferramenta que preferir, chama a skill, e ela varre
+aquele projeto atrás dos serviços AWS que o código já usa — lendo o fonte, as configurações e os
+arquivos `.env` — e escreve o `infra/` com a estrutura correta.
 
-| Ferramenta | Onde é gravada |
-|---|---|
-| Claude Code | `~/.claude/skills/<skill>/SKILL.md` |
-| Cursor | `~/.cursor/rules/<skill>.mdc` |
-| Codex CLI | `~/.codex/AGENTS.md`, dentro de um bloco delimitado |
-| Gemini CLI | `~/.gemini/GEMINI.md`, dentro de um bloco delimitado |
+Todas as ferramentas recebem o mesmo formato Agent Skills, uma pasta por skill, então as instruções
+são carregadas só quando você chama a skill e nunca ficam em conversas que não têm a ver.
 
-Arquivos de instrução compartilhados são alterados só dentro desse bloco, e uma cópia `.bak` é
-gravada antes de qualquer mudança, então as suas próprias instruções continuam lá. A tela mostra
-todos os caminhos absolutos antes de gravar. O catálogo vem dentro do app e é atualizado pelo
-GitHub quando há conexão.
+| Ferramenta | Onde é gravada | Como chamar |
+|---|---|---|
+| Claude Code | `~/.claude/skills/aws-local-infra/SKILL.md` | `/aws-local-infra` |
+| Cursor | `~/.cursor/skills/aws-local-infra/SKILL.md` | `/aws-local-infra` |
+| Codex CLI | `~/.codex/skills/aws-local-infra/SKILL.md` | `$aws-local-infra` |
+| Gemini CLI | `~/.gemini/skills/aws-local-infra/SKILL.md` | escolhida pela descrição; `/skills` lista |
 
-Para instalar na mão, ou em um único projeto em vez de globalmente:
+A tela mostra todos os caminhos absolutos antes de gravar, e o catálogo vem dentro do app e é
+atualizado pelo GitHub quando há conexão. Reinicie o agente depois de instalar, porque as quatro
+ferramentas leem a pasta de skills na inicialização.
+
+As versões até a 1.2.0 gravavam uma rule do Cursor em `~/.cursor/rules` e acrescentavam um bloco ao
+`~/.codex/AGENTS.md` e ao `~/.gemini/GEMINI.md`. Instalar de novo remove os dois, guardando uma
+cópia `.bak` dos arquivos de instrução.
+
+Para instalar na mão, ou em um único projeto em vez de globalmente, troque `.claude` por `.cursor`,
+`.codex` ou `.gemini`:
 
 ```bash
 mkdir -p .claude/skills/aws-local-infra && \
@@ -155,8 +163,8 @@ curl -fsSL https://raw.githubusercontent.com/lucascosta95/aws-local-manager/main
   -o .claude/skills/aws-local-infra/SKILL.md
 ```
 
-Depois peça algo como *"prepare este projeto para debug local da AWS"*. A skill é Markdown puro,
-então também funciona colada no `AGENTS.md` ou no prompt de qualquer outro assistente.
+A skill é Markdown puro com frontmatter `name` e `description`, então também funciona colada no
+`AGENTS.md` ou no prompt de qualquer outro assistente.
 
 ### Templates Terraform
 
