@@ -125,10 +125,10 @@ fun ProjectSelectorScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(state.projects, key = { it.name }) { project ->
+                items(state.projects, key = { it.id }) { project ->
                     ProjectCard(
                         project = project,
-                        runningInfo = state.projectRunningInfo[project.name],
+                        runningInfo = state.projectRunningInfo[project.id],
                         onOpen = { onProjectOpen(project) },
                     )
                 }

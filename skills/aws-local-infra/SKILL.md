@@ -131,6 +131,10 @@ Only `name` is read. Unknown keys are ignored.
 }
 ```
 
+The app lists every project under the configured root, so give each one a name that tells it apart
+from its siblings. A repository whose services are all named after the same product ends up with a
+list of identical rows: name them after the service, not the product.
+
 ## Step 4: write the .tf files
 
 Group resources by kind, one file per kind: `queues.tf`, `topics.tf`, `buckets.tf`,

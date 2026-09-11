@@ -83,7 +83,7 @@ class ProjectSelectorViewModel(
         scope.launch(Dispatchers.IO) {
             val initialInfo =
                 projects.associate { project ->
-                    project.name to
+                    project.id to
                         ProjectRunningInfo(
                             totalRunning = 0,
                             totalNotRunning = project.resources.size,
@@ -95,13 +95,13 @@ class ProjectSelectorViewModel(
 
             val jobs =
                 projects.map { project ->
-                    async { project.name to checkProjectRunning(project, endpoint) }
+                    async { project.id to checkProjectRunning(project, endpoint) }
                 }
 
             jobs.forEach { job ->
-                val (projectName, info) = job.await()
+                val (projectId, info) = job.await()
                 _state.update { state ->
-                    state.copy(projectRunningInfo = state.projectRunningInfo + (projectName to info))
+                    state.copy(projectRunningInfo = state.projectRunningInfo + (projectId to info))
                 }
             }
         }
