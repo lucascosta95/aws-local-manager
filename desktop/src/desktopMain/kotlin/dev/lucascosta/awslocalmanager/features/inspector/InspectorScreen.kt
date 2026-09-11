@@ -504,6 +504,9 @@ private fun DetailPanel(
                             onLoadMore = viewModel::loadMoreItems,
                             modifier = Modifier.fillMaxSize(),
                         )
+
+                    is InspectorDetail.SsmDetail ->
+                        SsmDetailView(detail = detail, modifier = Modifier.fillMaxSize())
                 }
             }
 
@@ -1100,32 +1103,40 @@ private fun ErrorCard(
     }
 }
 
+private fun pluralizedCount(
+    count: Long,
+    singular: String,
+    plural: String,
+): String = (if (count == 1L) singular else plural).replace("{count}", count.toString())
+
 private fun localizedSummary(
     resource: InspectorResource,
     strings: InspectorStrings,
 ): String =
     when (resource.summaryType) {
-        "sqs" -> {
-            val count = resource.summaryCount
-            when {
-                count == null -> strings.inspectorSummarySqsUnknown
-                count == 1L -> strings.inspectorSummarySqsSingular.replace("{count}", "1")
-                else -> strings.inspectorSummarySqsPlural.replace("{count}", count.toString())
-            }
-        }
+        "sqs" ->
+            resource.summaryCount
+                ?.let { pluralizedCount(it, strings.inspectorSummarySqsSingular, strings.inspectorSummarySqsPlural) }
+                ?: strings.inspectorSummarySqsUnknown
 
-        "dynamo" -> {
-            val count = resource.summaryCount ?: 0L
-            if (count == 1L) {
-                strings.inspectorSummaryDynamoSingular.replace("{count}", "1")
-            } else {
-                strings.inspectorSummaryDynamoPlural.replace("{count}", count.toString())
-            }
-        }
+        "dynamo" ->
+            pluralizedCount(
+                resource.summaryCount ?: 0L,
+                strings.inspectorSummaryDynamoSingular,
+                strings.inspectorSummaryDynamoPlural,
+            )
 
         "sfn" -> strings.inspectorSummarySfn
         "s3" -> strings.inspectorSummaryS3
         "redis", "memcached" -> strings.inspectorSummaryElastiCache
+
+        "ssm" ->
+            pluralizedCount(
+                resource.summaryCount ?: 0L,
+                strings.inspectorSummarySsmSingular,
+                strings.inspectorSummarySsmPlural,
+            )
+
         else -> ""
     }
 
@@ -1274,4 +1285,41 @@ private fun ElastiCacheDetailView(
             }
         }
     }
+}
+
+@Composable
+private fun SsmDetailView(
+    detail: InspectorDetail.SsmDetail,
+    modifier: Modifier = Modifier,
+) {
+    val strings = LocalInspectorStrings.current
+
+    if (detail.parameters.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text(
+                strings.inspectorSsmEmpty,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    val tableColumns =
+        listOf(
+            TableColumn(strings.inspectorSsmNameColumn, 0.40f),
+            TableColumn(strings.inspectorSsmTypeColumn, 0.15f),
+            TableColumn(strings.inspectorSsmValueColumn, 0.45f),
+        )
+    val tableRows = detail.parameters.map { listOf(it.name, it.type, it.value) }
+
+    ResizableTable(
+        columns = tableColumns,
+        rows = tableRows,
+        modifier = modifier,
+        onRowCopy = { rowIndex ->
+            val parameter = detail.parameters[rowIndex]
+            """{ "name": "${parameter.name}", "type": "${parameter.type}", "value": "${parameter.value}" }"""
+        },
+    )
 }

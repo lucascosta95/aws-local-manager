@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuOpen
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.MonitorHeart
@@ -81,6 +82,7 @@ fun SideNav(
                 titleFn = { strings.navGroupTools },
                 items =
                     listOf(
+                        NavItem(Screen.Skills, Icons.Outlined.Extension) { strings.navSkills },
                         NavItem(Screen.Setup, Icons.Outlined.MonitorHeart) { strings.navSetup },
                         NavItem(Screen.Settings, Icons.Outlined.Settings) { strings.navSettings },
                     ),

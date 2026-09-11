@@ -15,6 +15,8 @@ sealed class Screen {
 
     object Inspector : Screen()
 
+    object Skills : Screen()
+
     object Settings : Screen()
 
     object Setup : Screen()

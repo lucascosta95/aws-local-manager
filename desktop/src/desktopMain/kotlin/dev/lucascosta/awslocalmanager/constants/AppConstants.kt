@@ -3,6 +3,7 @@ package dev.lucascosta.awslocalmanager.constants
 object AppConstants {
     // General
     const val APP_NAME = "AWS Local Manager"
+    const val APP_ICON_RESOURCE = "icon.png"
     const val EMPTY_STRING = ""
     const val UNKNOWN = "unknown"
     const val USER_HOME = "user.home"
@@ -26,7 +27,7 @@ object AppConstants {
     const val APPLICATION_OCTET_STREAM = "application/octet-stream"
 
     // Emulator
-    const val FLOCI_IMAGE = "floci/floci:1.5.19"
+    const val FLOCI_IMAGE = "floci/floci:2.0.1"
     const val EMULATOR_CONTAINER_NAME = "aws-local-manager-emulator"
     const val EMULATOR_PORT_MAPPING = "4566:4566"
     const val EMULATOR_HEALTH_PATH = "/_floci/health"
@@ -41,6 +42,15 @@ object AppConstants {
     const val TERRAFORM_FILE_EXTENSION = "tf"
     const val PROJECT_INFRA_SUBDIR = "infra"
     const val AWS_LOCAL_CONFIG_FILENAME = "aws-local.config.json"
+
+    // Skills
+    const val SKILLS_STATE_FILENAME = "skills.json"
+    const val SKILL_CATALOG_FILENAME = "catalog.json"
+    const val SKILL_MANIFEST_FILENAME = "SKILL.md"
+    const val SKILL_CATALOG_REF = "main"
+    const val SKILL_CATALOG_DIR = "skills"
+    const val SKILL_BLOCK_NAMESPACE = "aws-local-manager"
+    const val SKILL_BACKUP_SUFFIX = ".bak"
 
     // Window
     const val WINDOW_WIDTH_DP = 1280

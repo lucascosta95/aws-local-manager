@@ -5,6 +5,7 @@ import dev.lucascosta.awslocalmanager.data.remote.AwsElastiCacheClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsS3Client
 import dev.lucascosta.awslocalmanager.data.remote.AwsSnsClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsSqsClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsSsmClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsStepFunctionsClient
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorClient
 import dev.lucascosta.awslocalmanager.data.repository.MessageRepository
@@ -13,6 +14,8 @@ import dev.lucascosta.awslocalmanager.data.repository.RunningResourceRepository
 import dev.lucascosta.awslocalmanager.data.repository.SavedPayloadRepository
 import dev.lucascosta.awslocalmanager.data.repository.ServiceHealthRepository
 import dev.lucascosta.awslocalmanager.data.repository.ServiceRepository
+import dev.lucascosta.awslocalmanager.data.repository.SkillCatalogRepository
+import dev.lucascosta.awslocalmanager.data.repository.SkillStateRepository
 import dev.lucascosta.awslocalmanager.data.repository.UpdateRepository
 import org.koin.dsl.module
 
@@ -42,6 +45,8 @@ val dataModule =
         single { ServiceRepository(get()) }
         single { ServiceHealthRepository(get()) }
         single { SavedPayloadRepository() }
+        single { SkillCatalogRepository() }
+        single { SkillStateRepository() }
 
         single {
             RunningResourceRepository(
@@ -51,6 +56,7 @@ val dataModule =
                 dynamoDbClientFactory = { endpoint -> AwsDynamoDbClient(endpoint) },
                 stepFunctionsClientFactory = { endpoint -> AwsStepFunctionsClient(endpoint) },
                 elastiCacheClientFactory = { endpoint -> AwsElastiCacheClient(endpoint) },
+                ssmClientFactory = { endpoint -> AwsSsmClient(endpoint) },
             )
         }
     }

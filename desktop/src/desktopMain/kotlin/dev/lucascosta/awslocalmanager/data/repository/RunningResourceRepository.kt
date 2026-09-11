@@ -7,12 +7,14 @@ import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.StepFunctionsResource
 import dev.lucascosta.awslocalmanager.data.remote.AwsDynamoDbClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsElastiCacheClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsS3Client
 import dev.lucascosta.awslocalmanager.data.remote.AwsSnsClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsSqsClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsSsmClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsStepFunctionsClient
 import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +28,7 @@ class RunningResourceRepository(
     private val dynamoDbClientFactory: (String) -> AwsDynamoDbClient,
     private val stepFunctionsClientFactory: (String) -> AwsStepFunctionsClient,
     private val elastiCacheClientFactory: (String) -> AwsElastiCacheClient = ::AwsElastiCacheClient,
+    private val ssmClientFactory: (String) -> AwsSsmClient = ::AwsSsmClient,
 ) {
     suspend fun fetchAllRunningResources(
         endpoint: String,
@@ -38,8 +41,9 @@ class RunningResourceRepository(
             val dynamoJob = async { fetchDynamoDbResources(endpoint, activeServices) }
             val sfnJob = async { fetchStepFunctionsResources(endpoint, activeServices) }
             val elcJob = async { fetchElastiCacheResources(endpoint, activeServices) }
+            val ssmJob = async { fetchSsmResources(endpoint, activeServices) }
 
-            sqsJob.await() + snsJob.await() + s3Job.await() + dynamoJob.await() + sfnJob.await() + elcJob.await()
+            sqsJob.await() + snsJob.await() + s3Job.await() + dynamoJob.await() + sfnJob.await() + elcJob.await() + ssmJob.await()
         }
 
     suspend fun deleteResources(
@@ -163,6 +167,25 @@ class RunningResourceRepository(
                         type = ElastiCacheResource,
                         arn = ElastiCacheResource.buildArn(info.clusterId),
                         url = info.engine,
+                        projectName = null,
+                    )
+                }
+        }
+
+    private suspend fun fetchSsmResources(
+        endpoint: String,
+        activeServices: Set<String>,
+    ): List<RunningResource> =
+        if ("ssm" !in activeServices) {
+            emptyList()
+        } else {
+            ssmClientFactory(endpoint).listParameters().getOrElse { emptyList() }
+                .map { info ->
+                    RunningResource(
+                        name = info.name,
+                        type = SsmParameterResource,
+                        arn = SsmParameterResource.buildArn(info.name),
+                        url = null,
                         projectName = null,
                     )
                 }

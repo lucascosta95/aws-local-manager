@@ -170,3 +170,27 @@ object ElastiCacheCommands {
     fun deleteElastiCacheReplicationGroup(groupId: String): List<String> =
         listOf("aws", "elasticache", "delete-replication-group", "--replication-group-id", groupId)
 }
+
+object SsmCommands {
+    fun putParameter(
+        name: String,
+        value: String,
+        type: String,
+    ): List<String> =
+        listOf(
+            "aws",
+            "ssm",
+            "put-parameter",
+            "--name",
+            name,
+            "--value",
+            value,
+            "--type",
+            type,
+            "--overwrite",
+            "--output",
+            "text",
+        )
+
+    fun deleteParameter(name: String): List<String> = listOf("aws", "ssm", "delete-parameter", "--name", name)
+}

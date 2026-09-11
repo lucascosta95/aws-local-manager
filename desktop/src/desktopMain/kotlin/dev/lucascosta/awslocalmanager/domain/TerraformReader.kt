@@ -9,6 +9,8 @@ import dev.lucascosta.awslocalmanager.data.model.project.InfraProject
 import dev.lucascosta.awslocalmanager.data.model.project.ProjectConfig
 import dev.lucascosta.awslocalmanager.data.model.project.TerraformResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -70,37 +72,63 @@ class TerraformReader {
 
     private fun parseResourcesFromFile(file: File): List<TerraformResource> {
         val content = file.readText()
-        return resourcePattern.findAll(content).map { match ->
+        return resourcePattern.findAll(content).mapNotNull { match ->
             val awsPrefix = match.groupValues[1]
             val tfLabel = match.groupValues[2]
-            val resourceType = ResourceRegistry.fromTerraformPrefix(awsPrefix)
             val blockContent = extractBlock(content, match.range.last + 1)
-            val (awsName, extraProperties) =
-                if (awsPrefix == "aws_elasticache_cluster") {
-                    val clusterId = extractQuotedAttribute(blockContent, "cluster_id") ?: tfLabel.replace("_", "-")
-                    val engine = extractQuotedAttribute(blockContent, "engine") ?: ElastiCacheEngine.REDIS.cliValue
-                    val nodeType = extractQuotedAttribute(blockContent, "node_type") ?: "cache.t3.micro"
-                    val numNodes = extractQuotedAttribute(blockContent, "num_cache_nodes") ?: "1"
-                    val defaultPort =
-                        if (engine == ElastiCacheEngine.REDIS.cliValue) {
-                            ElastiCacheEngine.REDIS.defaultPort
-                        } else {
-                            ElastiCacheEngine.MEMCACHED.defaultPort
-                        }
-                    val port = extractQuotedAttribute(blockContent, "port") ?: defaultPort.toString()
-                    clusterId to mapOf("engine" to engine, "node_type" to nodeType, "num_cache_nodes" to numNodes, "port" to port)
-                } else {
-                    (namePattern.find(blockContent)?.groupValues?.get(1) ?: tfLabel.replace("_", "-")) to emptyMap()
-                }
+            val (awsName, extraProperties) = parseAttributes(awsPrefix, tfLabel, blockContent) ?: return@mapNotNull null
             TerraformResource(
                 tfLabel = tfLabel,
                 awsName = awsName,
-                resourceType = resourceType,
+                resourceType = ResourceRegistry.fromTerraformPrefix(awsPrefix),
                 rawAwsType = awsPrefix,
                 filePath = file.absolutePath,
                 extraProperties = extraProperties,
             )
         }.toList()
+    }
+
+    private fun parseAttributes(
+        awsPrefix: String,
+        tfLabel: String,
+        blockContent: String,
+    ): Pair<String, Map<String, String>>? =
+        when (awsPrefix) {
+            "aws_elasticache_cluster" -> parseElastiCacheAttributes(tfLabel, blockContent)
+            "aws_ssm_parameter" -> parseSsmParameterAttributes(blockContent)
+            else -> (namePattern.find(blockContent)?.groupValues?.get(1) ?: tfLabel.replace("_", "-")) to emptyMap()
+        }
+
+    private fun parseElastiCacheAttributes(
+        tfLabel: String,
+        blockContent: String,
+    ): Pair<String, Map<String, String>> {
+        val clusterId = extractQuotedAttribute(blockContent, "cluster_id") ?: tfLabel.replace("_", "-")
+        val engine = extractQuotedAttribute(blockContent, "engine") ?: ElastiCacheEngine.REDIS.cliValue
+        val nodeType = extractQuotedAttribute(blockContent, "node_type") ?: "cache.t3.micro"
+        val numNodes = extractQuotedAttribute(blockContent, "num_cache_nodes") ?: "1"
+        val defaultPort =
+            if (engine == ElastiCacheEngine.REDIS.cliValue) {
+                ElastiCacheEngine.REDIS.defaultPort
+            } else {
+                ElastiCacheEngine.MEMCACHED.defaultPort
+            }
+        val port = extractQuotedAttribute(blockContent, "port") ?: defaultPort.toString()
+        return clusterId to mapOf("engine" to engine, "node_type" to nodeType, "num_cache_nodes" to numNodes, "port" to port)
+    }
+
+    private fun parseSsmParameterAttributes(blockContent: String): Pair<String, Map<String, String>>? {
+        val name = namePattern.find(blockContent)?.groupValues?.get(1) ?: return null
+        val value = extractQuotedAttribute(blockContent, SsmParameterResource.VALUE_PROPERTY).orEmpty()
+        val type =
+            extractQuotedAttribute(blockContent, SsmParameterResource.TYPE_PROPERTY)
+                ?.let { SsmParameterType.fromCliValue(it).cliValue }
+                ?: SsmParameterType.STRING.cliValue
+        return name to
+            mapOf(
+                SsmParameterResource.VALUE_PROPERTY to value,
+                SsmParameterResource.TYPE_PROPERTY to type,
+            )
     }
 
     private fun extractBlock(

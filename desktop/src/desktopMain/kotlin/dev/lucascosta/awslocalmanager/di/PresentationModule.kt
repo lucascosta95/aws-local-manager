@@ -8,6 +8,7 @@ import dev.lucascosta.awslocalmanager.features.quick.QuickViewModel
 import dev.lucascosta.awslocalmanager.features.running.RunningViewModel
 import dev.lucascosta.awslocalmanager.features.settings.SettingsViewModel
 import dev.lucascosta.awslocalmanager.features.setup.SetupViewModel
+import dev.lucascosta.awslocalmanager.features.skills.SkillsViewModel
 import dev.lucascosta.awslocalmanager.features.update.UpdateViewModel
 import org.koin.dsl.module
 
@@ -32,4 +33,5 @@ val presentationModule =
         single { QuickViewModel(get()) }
         single { UpdateViewModel(get(), get()) }
         single { InspectorViewModel(get()) }
+        single { SkillsViewModel(get(), get(), get()) }
     }

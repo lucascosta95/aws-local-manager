@@ -15,6 +15,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -23,6 +26,8 @@ import androidx.compose.ui.window.application
 import dev.lucascosta.awslocalmanager.components.SideNav
 import dev.lucascosta.awslocalmanager.components.TopBar
 import dev.lucascosta.awslocalmanager.components.UpdateDialog
+import dev.lucascosta.awslocalmanager.constants.AppConstants
+import dev.lucascosta.awslocalmanager.constants.AppConstants.APP_ICON_RESOURCE
 import dev.lucascosta.awslocalmanager.constants.AppConstants.APP_NAME
 import dev.lucascosta.awslocalmanager.constants.AppConstants.WINDOW_HEIGHT_DP
 import dev.lucascosta.awslocalmanager.constants.AppConstants.WINDOW_WIDTH_DP
@@ -33,6 +38,7 @@ import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsSubscriptionResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
+import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.StepFunctionsResource
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorClient
 import dev.lucascosta.awslocalmanager.data.repository.AppPreferences
@@ -46,21 +52,26 @@ import dev.lucascosta.awslocalmanager.features.inspector.handler.ElastiCacheInsp
 import dev.lucascosta.awslocalmanager.features.inspector.handler.InspectorHandlerRegistry
 import dev.lucascosta.awslocalmanager.features.inspector.handler.S3InspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
+import dev.lucascosta.awslocalmanager.features.inspector.handler.SsmInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.StepFunctionsInspectorHandler
 import dev.lucascosta.awslocalmanager.features.project.ProjectSelectorViewModel
 import dev.lucascosta.awslocalmanager.features.quick.QuickViewModel
 import dev.lucascosta.awslocalmanager.features.running.RunningViewModel
 import dev.lucascosta.awslocalmanager.features.settings.SettingsViewModel
 import dev.lucascosta.awslocalmanager.features.setup.SetupViewModel
+import dev.lucascosta.awslocalmanager.features.skills.SkillsViewModel
 import dev.lucascosta.awslocalmanager.features.update.UpdateViewModel
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
+import dev.lucascosta.awslocalmanager.i18n.LocalSkillsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import dev.lucascosta.awslocalmanager.i18n.inspectorStringsForLanguage
+import dev.lucascosta.awslocalmanager.i18n.skillsStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.stringsForLanguage
 import dev.lucascosta.awslocalmanager.navigation.AppNavigation
 import dev.lucascosta.awslocalmanager.navigation.Screen
 import dev.lucascosta.awslocalmanager.theme.AppTheme
 import dev.lucascosta.awslocalmanager.theme.DesktopAppTheme
+import org.jetbrains.skia.Image
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 import java.awt.Desktop
@@ -75,6 +86,7 @@ fun main() {
         StepFunctionsResource,
         SnsSubscriptionResource,
         ElastiCacheResource,
+        SsmParameterResource,
     )
 
     InspectorHandlerRegistry.register(SqsInspectorHandler())
@@ -82,6 +94,9 @@ fun main() {
     InspectorHandlerRegistry.register(DynamoInspectorHandler())
     InspectorHandlerRegistry.register(S3InspectorHandler())
     InspectorHandlerRegistry.register(ElastiCacheInspectorHandler())
+    InspectorHandlerRegistry.register(SsmInspectorHandler())
+
+    val appIcon = loadAppIcon()
 
     application {
         val windowState = WindowState(size = DpSize(WINDOW_WIDTH_DP.dp, WINDOW_HEIGHT_DP.dp))
@@ -90,12 +105,22 @@ fun main() {
             onCloseRequest = ::exitApplication,
             title = APP_NAME,
             state = windowState,
+            icon = appIcon,
         ) {
             KoinApplication(application = { modules(appModules) }) {
                 AppRoot()
             }
         }
     }
+}
+
+private fun loadAppIcon(): Painter {
+    val stream =
+        checkNotNull(AppConstants::class.java.getResourceAsStream("/$APP_ICON_RESOURCE")) {
+            "Application icon $APP_ICON_RESOURCE is missing from the classpath"
+        }
+    val bytes = stream.use { it.readBytes() }
+    return BitmapPainter(Image.makeFromEncoded(bytes).toComposeImageBitmap())
 }
 
 @Composable
@@ -115,6 +140,7 @@ fun AppRoot() {
             koinInject<RunningViewModel>(),
             koinInject<QuickViewModel>(),
             koinInject<InspectorViewModel>(),
+            koinInject<SkillsViewModel>(),
             updateViewModel,
         )
 
@@ -131,6 +157,7 @@ fun AppRoot() {
     CompositionLocalProvider(
         LocalStrings provides stringsForLanguage(prefs.language),
         LocalInspectorStrings provides inspectorStringsForLanguage(prefs.language),
+        LocalSkillsStrings provides skillsStringsForLanguage(prefs.language),
     ) {
         DesktopAppTheme(appTheme = prefs.theme) {
             AppContent(
