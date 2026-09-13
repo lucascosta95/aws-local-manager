@@ -2,6 +2,8 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.security.MessageDigest
 
 val appVersion = "1.3.0"
+val appPackageName = "aws-local-manager"
+val linuxWindowClass = "$appPackageName-$appPackageName"
 val githubOwner = "lucascosta95"
 val githubRepo = "aws-local-manager"
 
@@ -10,6 +12,7 @@ val generateBuildConfig by tasks.registering {
     inputs.property("appVersion", appVersion)
     inputs.property("githubOwner", githubOwner)
     inputs.property("githubRepo", githubRepo)
+    inputs.property("linuxWindowClass", linuxWindowClass)
     outputs.dir(outputDir)
     doLast {
         val dir = outputDir.get().asFile.resolve("dev/lucascosta/awslocalmanager")
@@ -22,6 +25,7 @@ val generateBuildConfig by tasks.registering {
                 const val APP_VERSION = "$appVersion"
                 const val GITHUB_OWNER = "$githubOwner"
                 const val GITHUB_REPO = "$githubRepo"
+                const val LINUX_WINDOW_CLASS = "$linuxWindowClass"
             }
             """.trimIndent()
                 .plus("\n"),
@@ -162,7 +166,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb)
-            packageName = "aws-local-manager"
+            packageName = appPackageName
             packageVersion = appVersion
             description = "Desktop GUI for managing local AWS emulator services"
             copyright = "© 2026 AWS Local Manager"
@@ -183,6 +187,8 @@ compose.desktop {
                     "java.base/java.nio=ALL-UNNAMED",
                     "--add-opens",
                     "java.base/java.util=ALL-UNNAMED",
+                    "--add-opens",
+                    "java.desktop/sun.awt.X11=ALL-UNNAMED",
                 )
 
             linux {

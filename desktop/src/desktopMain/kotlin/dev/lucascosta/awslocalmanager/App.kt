@@ -79,9 +79,13 @@ import org.jetbrains.skia.Image
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 import java.awt.Desktop
+import java.awt.Toolkit
 import java.net.URI
+import java.util.Locale
 
 fun main() {
+    alignLinuxWindowClass()
+
     ResourceRegistry.register(
         SnsResource,
         S3Resource,
@@ -115,6 +119,19 @@ fun main() {
                 AppRoot()
             }
         }
+    }
+}
+
+private fun alignLinuxWindowClass() {
+    if (!System.getProperty("os.name").lowercase(Locale.ROOT).contains("linux")) return
+    // GNOME matches a window to its menu entry by window class, which AWT derives from the main
+    // class name. Without this the dock cannot find the entry and falls back to a generic icon.
+    runCatching {
+        Toolkit.getDefaultToolkit()
+        Class.forName("sun.awt.X11.XToolkit")
+            .getDeclaredField("awtAppClassName")
+            .apply { isAccessible = true }
+            .set(null, BuildConfig.LINUX_WINDOW_CLASS)
     }
 }
 
