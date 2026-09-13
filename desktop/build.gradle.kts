@@ -1,7 +1,9 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.security.MessageDigest
 
-val appVersion = "1.2.0"
+val appVersion = "1.3.0"
+val appPackageName = "aws-local-manager"
+val linuxWindowClass = "$appPackageName-$appPackageName"
 val githubOwner = "lucascosta95"
 val githubRepo = "aws-local-manager"
 
@@ -10,6 +12,7 @@ val generateBuildConfig by tasks.registering {
     inputs.property("appVersion", appVersion)
     inputs.property("githubOwner", githubOwner)
     inputs.property("githubRepo", githubRepo)
+    inputs.property("linuxWindowClass", linuxWindowClass)
     outputs.dir(outputDir)
     doLast {
         val dir = outputDir.get().asFile.resolve("dev/lucascosta/awslocalmanager")
@@ -22,6 +25,7 @@ val generateBuildConfig by tasks.registering {
                 const val APP_VERSION = "$appVersion"
                 const val GITHUB_OWNER = "$githubOwner"
                 const val GITHUB_REPO = "$githubRepo"
+                const val LINUX_WINDOW_CLASS = "$linuxWindowClass"
             }
             """.trimIndent()
                 .plus("\n"),
@@ -35,22 +39,29 @@ val verifySkillCatalog by tasks.registering {
     val catalogFile = File(skillsDir, "catalog.json")
     inputs.dir(skillsDir)
     doLast {
-        Regex("\\{[^{}]*\\}").findAll(catalogFile.readText()).forEach { match ->
-            val entry = match.value
-            val path = Regex("\"path\"\\s*:\\s*\"([^\"]+)\"").find(entry)?.groupValues?.get(1)
-            val expected = Regex("\"sha256\"\\s*:\\s*\"([^\"]+)\"").find(entry)?.groupValues?.get(1)
-            if (path != null && expected != null) {
-                val file = File(skillsDir, path)
-                if (!file.isFile) {
-                    error("Skill file listed in catalog.json is missing: $path")
-                }
-                val actual =
-                    MessageDigest.getInstance("SHA-256")
-                        .digest(file.readBytes())
-                        .joinToString("") { byte -> "%02x".format(byte) }
-                if (actual != expected) {
-                    error("Checksum mismatch for $path. Set sha256 in skills/catalog.json to $actual")
-                }
+        @Suppress("UNCHECKED_CAST")
+        val catalog = groovy.json.JsonSlurper().parse(catalogFile) as Map<String, Any?>
+
+        @Suppress("UNCHECKED_CAST")
+        val entries =
+            catalog["skills"] as? List<Map<String, Any?>>
+                ?: error("skills/catalog.json has no skills array")
+        if (entries.isEmpty()) {
+            error("skills/catalog.json lists no skill")
+        }
+        entries.forEach { entry ->
+            val path = entry["path"] as? String ?: error("A skill in catalog.json has no path")
+            val expected = entry["sha256"] as? String ?: return@forEach
+            val file = File(skillsDir, path)
+            if (!file.isFile) {
+                error("Skill file listed in catalog.json is missing: $path")
+            }
+            val actual =
+                MessageDigest.getInstance("SHA-256")
+                    .digest(file.readBytes())
+                    .joinToString("") { byte -> "%02x".format(byte) }
+            if (actual != expected) {
+                error("Checksum mismatch for $path. Set sha256 in skills/catalog.json to $actual")
             }
         }
     }
@@ -101,6 +112,19 @@ tasks.matching { it.name.endsWith("ProcessResources") }.configureEach {
     dependsOn(verifySkillCatalog)
 }
 
+// jpackage swaps in the default Java icon without saying so; fail the build instead.
+tasks.matching { it.name.contains("Dmg") }.configureEach {
+    doFirst {
+        val icns = project.file("icons/icon.icns")
+        if (!icns.isFile) {
+            error("Missing ${icns.path}. Run scripts/generate_icns.sh on macOS to build it from icon.png.")
+        }
+        if (icns.readBytes().take(4).toByteArray().toString(Charsets.US_ASCII) != "icns") {
+            error("${icns.path} is not a valid .icns file. Regenerate it with scripts/generate_icns.sh.")
+        }
+    }
+}
+
 compose.resources {
     publicResClass = false
     generateResClass = always
@@ -142,7 +166,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb)
-            packageName = "aws-local-manager"
+            packageName = appPackageName
             packageVersion = appVersion
             description = "Desktop GUI for managing local AWS emulator services"
             copyright = "© 2026 AWS Local Manager"
@@ -163,6 +187,8 @@ compose.desktop {
                     "java.base/java.nio=ALL-UNNAMED",
                     "--add-opens",
                     "java.base/java.util=ALL-UNNAMED",
+                    "--add-opens",
+                    "java.desktop/sun.awt.X11=ALL-UNNAMED",
                 )
 
             linux {
@@ -172,7 +198,8 @@ compose.desktop {
                 iconFile.set(project.file("src/desktopMain/resources/icon.png"))
             }
             macOS {
-                iconFile.set(project.file("src/desktopMain/resources/icon.png"))
+                // jpackage reads only .icns here; a .png is ignored and the bundle gets the Java icon.
+                iconFile.set(project.file("icons/icon.icns"))
                 bundleID = "dev.lucascosta.awslocalmanager"
             }
         }

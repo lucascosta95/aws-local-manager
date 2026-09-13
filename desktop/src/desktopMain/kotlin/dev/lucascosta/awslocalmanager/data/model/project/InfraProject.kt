@@ -6,4 +6,6 @@ data class InfraProject(
     val name: String,
     val directory: File,
     val resources: List<TerraformResource>,
-)
+) {
+    val id: String get() = directory.absolutePath
+}

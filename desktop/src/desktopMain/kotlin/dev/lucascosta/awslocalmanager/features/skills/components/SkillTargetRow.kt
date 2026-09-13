@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.lucascosta.awslocalmanager.features.skills.TargetStatus
@@ -53,11 +54,22 @@ internal fun SkillTargetRow(
                 } else if (status.isInstalled) {
                     Text(strings.skillsInstalledBadge, style = MaterialTheme.typography.labelSmall, color = colors.info)
                 }
+                if (status.hasLegacyInstall) {
+                    Text(strings.skillsLegacyBadge, style = MaterialTheme.typography.labelSmall, color = colors.warning)
+                }
             }
             Text(
                 status.path,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                strings.skillsInvocationFmt.replace("{command}", status.invocation),
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

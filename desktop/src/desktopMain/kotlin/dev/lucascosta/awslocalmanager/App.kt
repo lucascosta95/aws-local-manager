@@ -54,6 +54,7 @@ import dev.lucascosta.awslocalmanager.features.inspector.handler.S3InspectorHand
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SsmInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.StepFunctionsInspectorHandler
+import dev.lucascosta.awslocalmanager.features.logs.LogsViewModel
 import dev.lucascosta.awslocalmanager.features.project.ProjectSelectorViewModel
 import dev.lucascosta.awslocalmanager.features.quick.QuickViewModel
 import dev.lucascosta.awslocalmanager.features.running.RunningViewModel
@@ -62,9 +63,12 @@ import dev.lucascosta.awslocalmanager.features.setup.SetupViewModel
 import dev.lucascosta.awslocalmanager.features.skills.SkillsViewModel
 import dev.lucascosta.awslocalmanager.features.update.UpdateViewModel
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
+import dev.lucascosta.awslocalmanager.i18n.LocalLanguage
+import dev.lucascosta.awslocalmanager.i18n.LocalLogsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalSkillsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import dev.lucascosta.awslocalmanager.i18n.inspectorStringsForLanguage
+import dev.lucascosta.awslocalmanager.i18n.logsStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.skillsStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.stringsForLanguage
 import dev.lucascosta.awslocalmanager.navigation.AppNavigation
@@ -75,9 +79,13 @@ import org.jetbrains.skia.Image
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 import java.awt.Desktop
+import java.awt.Toolkit
 import java.net.URI
+import java.util.Locale
 
 fun main() {
+    alignLinuxWindowClass()
+
     ResourceRegistry.register(
         SnsResource,
         S3Resource,
@@ -114,6 +122,19 @@ fun main() {
     }
 }
 
+private fun alignLinuxWindowClass() {
+    if (!System.getProperty("os.name").lowercase(Locale.ROOT).contains("linux")) return
+    // GNOME matches a window to its menu entry by window class, which AWT derives from the main
+    // class name. Without this the dock cannot find the entry and falls back to a generic icon.
+    runCatching {
+        Toolkit.getDefaultToolkit()
+        Class.forName("sun.awt.X11.XToolkit")
+            .getDeclaredField("awtAppClassName")
+            .apply { isAccessible = true }
+            .set(null, BuildConfig.LINUX_WINDOW_CLASS)
+    }
+}
+
 private fun loadAppIcon(): Painter {
     val stream =
         checkNotNull(AppConstants::class.java.getResourceAsStream("/$APP_ICON_RESOURCE")) {
@@ -141,6 +162,7 @@ fun AppRoot() {
             koinInject<QuickViewModel>(),
             koinInject<InspectorViewModel>(),
             koinInject<SkillsViewModel>(),
+            koinInject<LogsViewModel>(),
             updateViewModel,
         )
 
@@ -155,9 +177,11 @@ fun AppRoot() {
     val updateAvailable by updateViewModel.updateAvailable.collectAsState()
 
     CompositionLocalProvider(
+        LocalLanguage provides prefs.language,
         LocalStrings provides stringsForLanguage(prefs.language),
         LocalInspectorStrings provides inspectorStringsForLanguage(prefs.language),
         LocalSkillsStrings provides skillsStringsForLanguage(prefs.language),
+        LocalLogsStrings provides logsStringsForLanguage(prefs.language),
     ) {
         DesktopAppTheme(appTheme = prefs.theme) {
             AppContent(

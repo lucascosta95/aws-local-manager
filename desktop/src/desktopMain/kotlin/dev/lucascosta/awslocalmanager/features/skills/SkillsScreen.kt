@@ -38,6 +38,7 @@ import dev.lucascosta.awslocalmanager.features.skills.components.InstallConfirmD
 import dev.lucascosta.awslocalmanager.features.skills.components.SkillListItem
 import dev.lucascosta.awslocalmanager.features.skills.components.SkillPreviewDialog
 import dev.lucascosta.awslocalmanager.features.skills.components.SkillTargetRow
+import dev.lucascosta.awslocalmanager.i18n.LocalLanguage
 import dev.lucascosta.awslocalmanager.i18n.LocalSkillsStrings
 import dev.lucascosta.awslocalmanager.theme.LocalAppColors
 import org.koin.compose.koinInject
@@ -131,6 +132,7 @@ private fun SkillDetail(
     modifier: Modifier = Modifier,
 ) {
     val strings = LocalSkillsStrings.current
+    val language = LocalLanguage.current
     val entry = state.selectedSkill
 
     if (entry == null) {
@@ -144,13 +146,13 @@ private fun SkillDetail(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(entry.name, style = MaterialTheme.typography.titleSmall)
+        Text(entry.localizedName(language), style = MaterialTheme.typography.titleSmall)
         Text(
             strings.skillsVersionFmt.replace("{version}", entry.version),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(entry.description, style = MaterialTheme.typography.bodyMedium)
+        Text(entry.localizedDescription(language), style = MaterialTheme.typography.bodyMedium)
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
@@ -191,13 +193,15 @@ private fun SkillDetail(
 private fun SkillFeedback(state: SkillsUiState) {
     val strings = LocalSkillsStrings.current
     val colors = LocalAppColors.current
+    val language = LocalLanguage.current
     val feedback = state.feedback
+    val skillName = state.selectedSkill?.localizedName(language).orEmpty()
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (feedback != null && feedback.installedPaths.isNotEmpty()) {
             Text(
                 strings.skillsInstalledFmt
-                    .replace("{name}", feedback.skillName)
+                    .replace("{name}", skillName)
                     .replace("{count}", feedback.installedPaths.size.toString()),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.success,
@@ -206,7 +210,7 @@ private fun SkillFeedback(state: SkillsUiState) {
         if (feedback != null && feedback.removedPaths.isNotEmpty()) {
             Text(
                 strings.skillsRemovedFmt
-                    .replace("{name}", feedback.skillName)
+                    .replace("{name}", skillName)
                     .replace("{count}", feedback.removedPaths.size.toString()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

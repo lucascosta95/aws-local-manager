@@ -18,6 +18,7 @@ import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
 import dev.lucascosta.awslocalmanager.data.remote.ProcessLine
 import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
+import dev.lucascosta.awslocalmanager.domain.AppLogger
 import dev.lucascosta.awslocalmanager.domain.AwsResourceChecker
 import dev.lucascosta.awslocalmanager.domain.ServiceStatusChecker
 import dev.lucascosta.awslocalmanager.domain.TerraformReader
@@ -43,6 +44,7 @@ class InfrastructureViewModel(
     private val resourceChecker: AwsResourceChecker,
 ) : BaseViewModel() {
     private companion object {
+        const val LOG_SOURCE = "Infrastructure"
         const val EXIT_CODE_ALREADY_EXISTS = 254
 
         fun computeAllSelected(
@@ -156,7 +158,10 @@ class InfrastructureViewModel(
                     doRefresh(project)
                     _state.update { it.copy(templateCreatedFile = fileName) }
                 }
-                .onFailure { exception -> _state.update { it.copy(error = exception.message) } }
+                .onFailure { exception ->
+                    AppLogger.error(LOG_SOURCE, "Could not create template $fileName", exception)
+                    _state.update { it.copy(error = exception.message) }
+                }
         }
     }
 

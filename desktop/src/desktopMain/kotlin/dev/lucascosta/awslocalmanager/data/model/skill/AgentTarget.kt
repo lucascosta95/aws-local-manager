@@ -1,21 +1,20 @@
 package dev.lucascosta.awslocalmanager.data.model.skill
 
-/**
- * How a skill is written into an agent tool.
- *
- * [SKILL_DIRECTORY] one folder per skill, holding a SKILL.md with its original frontmatter.
- * [RULE_FILE] one rule file per skill inside a shared rules folder.
- * [INSTRUCTION_FILE] a single instruction file shared by every skill, where each one lives in a delimited block.
- */
-enum class SkillInstallMode { SKILL_DIRECTORY, RULE_FILE, INSTRUCTION_FILE }
+enum class LegacyInstallMode { RULE_FILE, INSTRUCTION_FILE }
+
+data class LegacyInstall(
+    val mode: LegacyInstallMode,
+    val relativePath: String,
+    val fileExtension: String = "md",
+)
 
 data class AgentTarget(
     val id: String,
     val displayName: String,
-    val mode: SkillInstallMode,
-    val relativePath: String,
+    val skillsPath: String,
     val detectionPath: String,
-    val fileExtension: String = "md",
+    val invocation: String,
+    val legacy: LegacyInstall? = null,
 )
 
 object AgentTargetRegistry {
@@ -24,31 +23,33 @@ object AgentTargetRegistry {
             AgentTarget(
                 id = "claude-code",
                 displayName = "Claude Code",
-                mode = SkillInstallMode.SKILL_DIRECTORY,
-                relativePath = ".claude/skills",
+                skillsPath = ".claude/skills",
                 detectionPath = ".claude",
+                invocation = "/{skill}",
             ),
             AgentTarget(
                 id = "cursor",
                 displayName = "Cursor",
-                mode = SkillInstallMode.RULE_FILE,
-                relativePath = ".cursor/rules",
+                skillsPath = ".cursor/skills",
                 detectionPath = ".cursor",
-                fileExtension = "mdc",
+                invocation = "/{skill}",
+                legacy = LegacyInstall(LegacyInstallMode.RULE_FILE, ".cursor/rules", "mdc"),
             ),
             AgentTarget(
                 id = "codex",
                 displayName = "Codex CLI",
-                mode = SkillInstallMode.INSTRUCTION_FILE,
-                relativePath = ".codex/AGENTS.md",
+                skillsPath = ".codex/skills",
                 detectionPath = ".codex",
+                invocation = "\${skill}",
+                legacy = LegacyInstall(LegacyInstallMode.INSTRUCTION_FILE, ".codex/AGENTS.md"),
             ),
             AgentTarget(
                 id = "gemini-cli",
                 displayName = "Gemini CLI",
-                mode = SkillInstallMode.INSTRUCTION_FILE,
-                relativePath = ".gemini/GEMINI.md",
+                skillsPath = ".gemini/skills",
                 detectionPath = ".gemini",
+                invocation = "/skills",
+                legacy = LegacyInstall(LegacyInstallMode.INSTRUCTION_FILE, ".gemini/GEMINI.md"),
             ),
         )
 

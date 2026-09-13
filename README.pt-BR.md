@@ -54,6 +54,20 @@ docker pull floci/floci:2.0.1
 
 > A tela de Setup verifica todos os pré-requisitos na inicialização e pode corrigir a maioria dos problemas com um clique.
 
+O app procura `docker`, `colima` e `aws` no `PATH` e, se não achar, nos lugares onde essas
+ferramentas costumam ser instaladas (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.docker/bin`,
+`~/.rd/bin`, entre outros). Isso importa no macOS: um app aberto pelo Finder é iniciado pelo launchd
+com um `PATH` de `/usr/bin:/bin:/usr/sbin:/sbin` e nunca lê o perfil do seu shell, então uma
+instalação via Homebrew fica invisível para ele mesmo que as mesmas ferramentas funcionem no
+terminal. A tela de Logs registra onde cada ferramenta foi encontrada, ou que não foi.
+
+Cada release é fixada em uma versão do emulador. Ao atualizar de uma release que usava outra, o Setup
+mostra a imagem e o emulador como **Desatualizado**: o Docker mantém a imagem antiga e continua
+servindo ela ao container já criado a partir dela, então um `docker pull` sozinho não resolve.
+Corrigir a verificação da imagem baixa a versão suportada, remove o container que o app criou com a
+imagem antiga, e apaga a imagem antiga. Corrigir a verificação do emulador recria o container na
+versão suportada. Tudo que for removido aparece no log da correção.
+
 ---
 
 ## 📦 Instalação
@@ -129,25 +143,52 @@ Identifica o projeto dentro do app. Apenas `name` é obrigatório:
 }
 ```
 
+### Logs da sessão
+
+A entrada **Logs** na barra lateral mostra tudo que o app fez desde que abriu: cada comando externo
+executado com o código de saída, cada falha ao consultar a saúde do emulador, e cada exceção
+capturada, com o stack trace a um clique. É o único lugar onde essas exceções aparecem — no resto do
+app ele informa que algo falhou sem dizer o que foi lançado.
+
+O buffer vive em memória, é limitado a 2000 entradas e nunca é gravado em disco, então fechar o app
+descarta tudo. Entradas idênticas em sequência viram uma só com um contador, o que evita que uma
+falha em polling soterre o resto. Dá para filtrar por nível, por origem ou por texto livre na
+mensagem e no stack trace, copiar o que está visível, ou limpar.
+
+A lista só acompanha a entrada mais nova enquanto você está no fim dela: subir o scroll interrompe,
+voltar ao fim retoma, e o chip Tail pula para o final. Passar o mouse numa linha revela um botão que
+copia aquela entrada junto com o stack trace.
+
+Os painéis de log que já existem nas telas de Infraestrutura e Setup continuam iguais; esta é uma
+visão separada sobre tudo de uma vez.
+
 ### Skill para agentes de IA
 
 A tela **Skills** instala a skill do repositório nas ferramentas de IA encontradas na sua pasta
-pessoal. O agente então lê o projeto, infere as filas, tópicos e buckets que já são usados e
-escreve o `infra/` com a estrutura correta.
+pessoal. Depois você abre qualquer projeto na ferramenta que preferir, chama a skill, e ela varre
+aquele projeto atrás dos serviços AWS que o código já usa — lendo o fonte, as configurações e os
+arquivos `.env` — e escreve o `infra/` com a estrutura correta.
 
-| Ferramenta | Onde é gravada |
-|---|---|
-| Claude Code | `~/.claude/skills/<skill>/SKILL.md` |
-| Cursor | `~/.cursor/rules/<skill>.mdc` |
-| Codex CLI | `~/.codex/AGENTS.md`, dentro de um bloco delimitado |
-| Gemini CLI | `~/.gemini/GEMINI.md`, dentro de um bloco delimitado |
+Todas as ferramentas recebem o mesmo formato Agent Skills, uma pasta por skill, então as instruções
+são carregadas só quando você chama a skill e nunca ficam em conversas que não têm a ver.
 
-Arquivos de instrução compartilhados são alterados só dentro desse bloco, e uma cópia `.bak` é
-gravada antes de qualquer mudança, então as suas próprias instruções continuam lá. A tela mostra
-todos os caminhos absolutos antes de gravar. O catálogo vem dentro do app e é atualizado pelo
-GitHub quando há conexão.
+| Ferramenta | Onde é gravada | Como chamar |
+|---|---|---|
+| Claude Code | `~/.claude/skills/aws-local-infra/SKILL.md` | `/aws-local-infra` |
+| Cursor | `~/.cursor/skills/aws-local-infra/SKILL.md` | `/aws-local-infra` |
+| Codex CLI | `~/.codex/skills/aws-local-infra/SKILL.md` | `$aws-local-infra` |
+| Gemini CLI | `~/.gemini/skills/aws-local-infra/SKILL.md` | escolhida pela descrição; `/skills` lista |
 
-Para instalar na mão, ou em um único projeto em vez de globalmente:
+A tela mostra todos os caminhos absolutos antes de gravar, e o catálogo vem dentro do app e é
+atualizado pelo GitHub quando há conexão. Reinicie o agente depois de instalar, porque as quatro
+ferramentas leem a pasta de skills na inicialização.
+
+As versões até a 1.2.0 gravavam uma rule do Cursor em `~/.cursor/rules` e acrescentavam um bloco ao
+`~/.codex/AGENTS.md` e ao `~/.gemini/GEMINI.md`. Instalar de novo remove os dois, guardando uma
+cópia `.bak` dos arquivos de instrução.
+
+Para instalar na mão, ou em um único projeto em vez de globalmente, troque `.claude` por `.cursor`,
+`.codex` ou `.gemini`:
 
 ```bash
 mkdir -p .claude/skills/aws-local-infra && \
@@ -155,8 +196,13 @@ curl -fsSL https://raw.githubusercontent.com/lucascosta95/aws-local-manager/main
   -o .claude/skills/aws-local-infra/SKILL.md
 ```
 
-Depois peça algo como *"prepare este projeto para debug local da AWS"*. A skill é Markdown puro,
-então também funciona colada no `AGENTS.md` ou no prompt de qualquer outro assistente.
+A skill é Markdown puro com frontmatter `name` e `description`, então também funciona colada no
+`AGENTS.md` ou no prompt de qualquer outro assistente.
+
+A skill em si é escrita em inglês, porque é o que o agente lê. A tela em volta dela segue o idioma
+selecionado no app: cada entrada do `skills/catalog.json` tem um mapa `translations` com a tag de
+idioma como chave, e uma skill publicada sem tradução cai no `name` e `description` em inglês.
+O **Ver conteúdo** mostra sempre a skill como ela é instalada.
 
 ### Templates Terraform
 
@@ -387,7 +433,19 @@ Gerar pacotes nativos:
 ./gradlew :desktop:packageDmg
 ```
 
-Os arquivos gerados ficam em `desktop/build/compose/binaries/`.
+Os arquivos gerados ficam em `desktop/build/compose/binaries/`. Cada pacote precisa ser gerado no
+sistema de destino, porque o `jpackage` só produz o formato da máquina em que roda.
+
+O bundle do macOS tira o ícone de `desktop/icons/icon.icns`, porque o `jpackage` só lê `.icns` ali e
+ignora um `.png` sem avisar. Depois de trocar o `desktop/src/desktopMain/resources/icon.png`,
+regenere num Mac:
+
+```bash
+./scripts/generate_icns.sh
+```
+
+A geração do `.dmg` falha se esse arquivo sumir ou não for um `.icns` de verdade, em vez de entregar
+o ícone padrão do Java em silêncio. O Linux continua usando o `.png` direto, que o `.deb` aceita.
 
 ---
 

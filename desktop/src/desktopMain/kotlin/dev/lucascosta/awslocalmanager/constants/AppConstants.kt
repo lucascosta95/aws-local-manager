@@ -27,11 +27,18 @@ object AppConstants {
     const val APPLICATION_OCTET_STREAM = "application/octet-stream"
 
     // Emulator
-    const val FLOCI_IMAGE = "floci/floci:2.0.1"
+    const val FLOCI_REPOSITORY = "floci/floci"
+    const val FLOCI_VERSION = "2.0.1"
+    const val FLOCI_IMAGE = "$FLOCI_REPOSITORY:$FLOCI_VERSION"
+    const val DOCKER_UNTAGGED = "<none>"
     const val EMULATOR_CONTAINER_NAME = "aws-local-manager-emulator"
     const val EMULATOR_PORT_MAPPING = "4566:4566"
     const val EMULATOR_HEALTH_PATH = "/_floci/health"
     const val DOCKER_SOCKET_BINDING = "/var/run/docker.sock:/var/run/docker.sock"
+
+    // Session log
+    const val LOG_MAX_ENTRIES = 2000
+    const val LOG_TIME_PATTERN = "HH:mm:ss.SSS"
 
     // App data
     const val APP_DATA_DIR_NAME = ".aws-local-manager"

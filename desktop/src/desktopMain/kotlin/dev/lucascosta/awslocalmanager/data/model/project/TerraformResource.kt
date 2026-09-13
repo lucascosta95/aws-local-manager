@@ -11,4 +11,6 @@ data class TerraformResource(
     val extraProperties: Map<String, String> = emptyMap(),
 ) {
     val isSupported: Boolean get() = resourceType?.isSupported == true
+
+    val id: String get() = "$rawAwsType.$tfLabel"
 }

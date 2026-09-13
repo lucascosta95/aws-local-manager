@@ -26,6 +26,8 @@ data class SkillsStrings(
     val skillsNotDetected: String,
     val skillsInstalledBadge: String,
     val skillsUpdateBadge: String,
+    val skillsLegacyBadge: String,
+    val skillsInvocationFmt: String,
     val skillsInstall: String,
     val skillsUninstall: String,
     val skillsPreview: String,
@@ -44,7 +46,9 @@ data class SkillsStrings(
 val SkillsStringsEnUs =
     SkillsStrings(
         skillsTitle = "Skills",
-        skillsSubtitle = "Install these instructions into your AI coding tools, so they can prepare a project for local debugging.",
+        skillsSubtitle =
+            "Install this skill into your AI coding tools. Open any project in one of them, call the skill, " +
+                "and it prepares that project for local debugging.",
         skillsRefresh = "Refresh catalog",
         skillsSourceRemote = "Online catalog",
         skillsSourceBundled = "Bundled catalog",
@@ -52,11 +56,15 @@ val SkillsStringsEnUs =
         skillsSelectHint = "Select a skill to see where it can be installed",
         skillsVersionFmt = "version {version}",
         skillsTargets = "Tools",
-        skillsTargetsHint = "Only tools detected in your home folder are selected by default.",
+        skillsTargetsHint =
+            "Each tool gets its own skills folder, so the skill is only loaded when you call it. " +
+                "Only tools detected in your home folder are selected by default.",
         skillsDetected = "Detected",
         skillsNotDetected = "Not detected",
         skillsInstalledBadge = "Installed",
         skillsUpdateBadge = "Update available",
+        skillsLegacyBadge = "Old install to replace",
+        skillsInvocationFmt = "call it with {command}",
         skillsInstall = "Install",
         skillsUninstall = "Remove",
         skillsPreview = "View content",
@@ -65,7 +73,9 @@ val SkillsStringsEnUs =
         skillsCancel = "Cancel",
         skillsConfirmTitle = "Confirm installation",
         skillsConfirmMessage = "These files will be written:",
-        skillsConfirmWarning = "Shared instruction files are edited inside a delimited block and a .bak copy is kept.",
+        skillsConfirmWarning =
+            "Anything an earlier version left in ~/.cursor/rules, AGENTS.md or GEMINI.md for this skill is removed. " +
+                "Shared instruction files keep a .bak copy.",
         skillsInstalledFmt = "{name} installed in {count} location(s)",
         skillsRemovedFmt = "{name} removed from {count} location(s)",
         skillsFailedFmt = "Failed for: {targets}",
@@ -75,7 +85,9 @@ val SkillsStringsEnUs =
 val SkillsStringsPtBr =
     SkillsStrings(
         skillsTitle = "Skills",
-        skillsSubtitle = "Instale estas instruções nas suas ferramentas de IA, para que elas preparem um projeto para debug local.",
+        skillsSubtitle =
+            "Instale esta skill nas suas ferramentas de IA. Abra um projeto em qualquer uma delas, chame a skill, " +
+                "e ela prepara aquele projeto para debug local.",
         skillsRefresh = "Atualizar catálogo",
         skillsSourceRemote = "Catálogo online",
         skillsSourceBundled = "Catálogo local",
@@ -83,11 +95,15 @@ val SkillsStringsPtBr =
         skillsSelectHint = "Selecione uma skill para ver onde ela pode ser instalada",
         skillsVersionFmt = "versão {version}",
         skillsTargets = "Ferramentas",
-        skillsTargetsHint = "Só as ferramentas detectadas na sua pasta pessoal vêm marcadas por padrão.",
+        skillsTargetsHint =
+            "Cada ferramenta recebe a skill na própria pasta de skills, então ela só é carregada quando você a chama. " +
+                "Só as ferramentas detectadas na sua pasta pessoal vêm marcadas por padrão.",
         skillsDetected = "Detectada",
         skillsNotDetected = "Não detectada",
         skillsInstalledBadge = "Instalada",
         skillsUpdateBadge = "Atualização disponível",
+        skillsLegacyBadge = "Instalação antiga a substituir",
+        skillsInvocationFmt = "chame com {command}",
         skillsInstall = "Instalar",
         skillsUninstall = "Remover",
         skillsPreview = "Ver conteúdo",
@@ -96,7 +112,9 @@ val SkillsStringsPtBr =
         skillsCancel = "Cancelar",
         skillsConfirmTitle = "Confirmar instalação",
         skillsConfirmMessage = "Estes arquivos serão gravados:",
-        skillsConfirmWarning = "Arquivos de instrução compartilhados recebem um bloco delimitado, e uma cópia .bak é mantida.",
+        skillsConfirmWarning =
+            "O que uma versão anterior deixou em ~/.cursor/rules, AGENTS.md ou GEMINI.md para esta skill é removido. " +
+                "Arquivos de instrução compartilhados ficam com uma cópia .bak.",
         skillsInstalledFmt = "{name} instalada em {count} local(is)",
         skillsRemovedFmt = "{name} removida de {count} local(is)",
         skillsFailedFmt = "Falhou em: {targets}",

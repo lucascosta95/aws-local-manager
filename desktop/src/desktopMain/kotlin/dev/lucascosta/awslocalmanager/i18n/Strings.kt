@@ -2,8 +2,11 @@ package dev.lucascosta.awslocalmanager.i18n
 
 import androidx.compose.runtime.compositionLocalOf
 import dev.lucascosta.awslocalmanager.constants.AppConstants.ENGLISH
+import dev.lucascosta.awslocalmanager.constants.AppConstants.PORTUGUESE
 
 val LocalStrings = compositionLocalOf<Strings> { PtBrStrings }
+
+val LocalLanguage = compositionLocalOf { PORTUGUESE }
 
 fun stringsForLanguage(tag: String): Strings =
     when (tag) {
@@ -24,6 +27,7 @@ data class Strings(
     val navProject: String,
     val navQuick: String,
     val navSkills: String,
+    val navLogs: String,
     val topBarConnectionOnline: String,
     val topBarConnectionOffline: String,
     val topBarRefresh: String,
@@ -118,16 +122,19 @@ data class Strings(
     val setupStatusOk: String,
     val setupStatusMissing: String,
     val setupStatusNotRunning: String,
+    val setupStatusOutdated: String,
     val setupStatusUnknown: String,
     val setupStatusChecking: String,
     val emulatorImageCheckName: String,
     val emulatorImageOk: String,
     val emulatorImageNotFound: String,
+    val emulatorImageOutdated: String,
     val emulatorImagePulling: String,
     val emulatorImagePullError: String,
     val emulatorRunningCheckName: String,
     val emulatorRunning: String,
     val emulatorNotRunning: String,
+    val emulatorOutdated: String,
     val emulatorStarting: String,
     val emulatorStartError: String,
     val projectTitle: String,

@@ -119,7 +119,7 @@ fun InfrastructureScreen(
                                 modifier = Modifier.fillMaxSize().padding(end = 12.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                items(visibleResources, key = { it.tfLabel }) { resource ->
+                                items(visibleResources, key = { it.id }) { resource ->
                                     ResourceRow(
                                         resource = resource,
                                         isSelected = resource.tfLabel in state.selectedResources,

@@ -19,6 +19,7 @@ import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import dev.lucascosta.awslocalmanager.data.repository.RunningResourceRepository
 import dev.lucascosta.awslocalmanager.data.repository.SavedPayloadRepository
 import dev.lucascosta.awslocalmanager.data.repository.ServiceHealthRepository
+import dev.lucascosta.awslocalmanager.domain.AppLogger
 import dev.lucascosta.awslocalmanager.domain.AssociateResourcesUseCase
 import dev.lucascosta.awslocalmanager.domain.TerraformReader
 import dev.lucascosta.awslocalmanager.domain.guessContentType
@@ -50,6 +51,7 @@ class RunningViewModel(
     private val associateResources: AssociateResourcesUseCase,
 ) : BaseViewModel() {
     companion object {
+        private const val LOG_SOURCE = "Running"
         private val prettyJson = Json { prettyPrint = true }
     }
 
@@ -384,7 +386,9 @@ class RunningViewModel(
 
     private suspend fun fetchProjectsFromDisk(projectsDir: String) =
         withContext(Dispatchers.IO) {
-            runCatching { terraformReader.findProjects(File(projectsDir)) }.getOrElse { emptyList() }
+            runCatching { terraformReader.findProjects(File(projectsDir)) }
+                .onFailure { AppLogger.error(LOG_SOURCE, "Could not read projects from $projectsDir", it) }
+                .getOrElse { emptyList() }
         }
 
     private suspend fun publishS3(

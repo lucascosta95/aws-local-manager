@@ -54,6 +54,20 @@ docker pull floci/floci:2.0.1
 
 > The Setup screen checks all prerequisites on launch and can auto-fix most issues.
 
+The app looks for `docker`, `colima` and `aws` on `PATH` and, failing that, in the usual install
+locations (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.docker/bin`, `~/.rd/bin`, among others). This
+matters on macOS: an app launched from Finder is started by launchd with a bare
+`/usr/bin:/bin:/usr/sbin:/sbin` and never reads your shell profile, so a Homebrew install is
+invisible to it even though the same tools work in a terminal. The Logs screen records where each
+tool was found, or that it was not found at all.
+
+Each release is pinned to one emulator version. When you upgrade from a release that used an older
+one, Setup reports both the image and the emulator as **Outdated**: Docker keeps the old image and
+keeps serving it to the container already created from it, so a plain `docker pull` is not enough.
+Fixing the image check downloads the supported version, removes the container the app created from
+the old image, and deletes the old image. Fixing the emulator check then recreates the container on
+the supported version. Everything removed is named in the fix log.
+
 ---
 
 ## 📦 Installation
@@ -129,24 +143,52 @@ Identifies the project inside the app. Only `name` is required:
 }
 ```
 
+### Session logs
+
+The **Logs** entry in the side bar shows everything the app did since it started: every external
+command it ran with its exit code, every emulator health failure, and every exception it caught,
+with the stack trace one click away. It is the only place those exceptions surface — elsewhere the
+app reports that something failed without saying what threw.
+
+The buffer lives in memory, is capped at 2000 entries and is never written to disk, so closing the
+app discards it. Repeated identical entries collapse into one with a counter, which keeps a polling
+failure from burying everything else. Filter by level, by source or by free text over the message
+and the stack trace, copy what is visible, or clear it.
+
+The list follows the newest entry only while you are standing at the bottom of it: scrolling up
+stops that, scrolling back down resumes it, and the Tail chip jumps to the end. Hovering a line
+reveals a button that copies that entry with its stack trace.
+
+The log panels already on the Infrastructure and Setup screens are unchanged; this is a separate
+view over everything at once.
+
 ### AI agent skill
 
 The **Skills** screen installs the bundled skill into the AI coding tools found in your home
-folder. The agent then reads the project, infers the queues, topics and buckets it already
-uses, and writes `infra/` with the correct structure.
+folder. Afterwards you open any project in the tool you like, call the skill, and it sweeps that
+project for the AWS services the code already talks to — reading the source, the configuration and
+the `.env` files — then writes `infra/` with the correct structure.
 
-| Tool | Where it lands |
-|---|---|
-| Claude Code | `~/.claude/skills/<skill>/SKILL.md` |
-| Cursor | `~/.cursor/rules/<skill>.mdc` |
-| Codex CLI | `~/.codex/AGENTS.md`, inside a delimited block |
-| Gemini CLI | `~/.gemini/GEMINI.md`, inside a delimited block |
+Every tool gets the same Agent Skills layout, one folder per skill, so the instructions are loaded
+only when you call the skill and never sit in unrelated conversations.
 
-Shared instruction files are edited only inside that block, and a `.bak` copy is written before
-any change, so your own instructions survive. The screen shows every absolute path before
-writing anything. The catalog ships inside the app and is refreshed from GitHub when online.
+| Tool | Where it lands | How you call it |
+|---|---|---|
+| Claude Code | `~/.claude/skills/aws-local-infra/SKILL.md` | `/aws-local-infra` |
+| Cursor | `~/.cursor/skills/aws-local-infra/SKILL.md` | `/aws-local-infra` |
+| Codex CLI | `~/.codex/skills/aws-local-infra/SKILL.md` | `$aws-local-infra` |
+| Gemini CLI | `~/.gemini/skills/aws-local-infra/SKILL.md` | picked from its description; `/skills` lists it |
 
-To install by hand instead, or into a single project rather than globally:
+The screen shows every absolute path before writing anything, and the catalog ships inside the app
+and is refreshed from GitHub when online. Restart the agent after installing, since all four read
+their skills folder at startup.
+
+Releases up to 1.2.0 wrote a Cursor rule into `~/.cursor/rules` and appended a block to
+`~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`. Installing again removes both, keeping a `.bak`
+copy of the instruction files.
+
+To install by hand instead, or into a single project rather than globally, swap `.claude` for
+`.cursor`, `.codex` or `.gemini`:
 
 ```bash
 mkdir -p .claude/skills/aws-local-infra && \
@@ -154,8 +196,13 @@ curl -fsSL https://raw.githubusercontent.com/lucascosta95/aws-local-manager/main
   -o .claude/skills/aws-local-infra/SKILL.md
 ```
 
-Then ask it something like *"set up this project for local AWS debugging"*. The skill is plain
-Markdown, so it also works pasted into `AGENTS.md` or into the prompt of any other assistant.
+The skill is plain Markdown with `name` and `description` frontmatter, so it also works pasted into
+`AGENTS.md` or into the prompt of any other assistant.
+
+The skill itself is written in English, because that is what the agent reads. The screen around it
+follows the language selected in the app: each entry in `skills/catalog.json` carries a
+`translations` map keyed by language tag, and a skill published without a translation falls back to
+the English `name` and `description`. **View content** always shows the skill as it is installed.
 
 ### Terraform templates
 
@@ -386,7 +433,19 @@ Build native packages:
 ./gradlew :desktop:packageDmg
 ```
 
-Output is placed in `desktop/build/compose/binaries/`.
+Output is placed in `desktop/build/compose/binaries/`. Each package has to be built on the system it
+targets, since `jpackage` only produces the format of the machine it runs on.
+
+The macOS bundle takes its icon from `desktop/icons/icon.icns`, because `jpackage` reads only
+`.icns` there and ignores a `.png` without reporting anything. After changing
+`desktop/src/desktopMain/resources/icon.png`, regenerate it on a Mac:
+
+```bash
+./scripts/generate_icns.sh
+```
+
+The `.dmg` build fails if that file is missing or is not a real `.icns`, rather than quietly
+shipping the default Java icon. Linux keeps using the `.png` directly, which `.deb` accepts.
 
 ---
 

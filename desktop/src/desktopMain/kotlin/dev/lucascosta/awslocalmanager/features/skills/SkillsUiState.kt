@@ -9,14 +9,17 @@ data class TargetStatus(
     val isDetected: Boolean,
     val installedVersion: String?,
     val path: String,
+    val invocation: String,
+    val legacyPath: String? = null,
 ) {
+    val hasLegacyInstall: Boolean get() = legacyPath != null
+
     val isInstalled: Boolean get() = installedVersion != null
 
     fun hasUpdate(availableVersion: String): Boolean = installedVersion != null && installedVersion != availableVersion
 }
 
 data class InstallFeedback(
-    val skillName: String,
     val installedPaths: List<String> = emptyList(),
     val removedPaths: List<String> = emptyList(),
     val failedTargets: List<String> = emptyList(),

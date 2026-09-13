@@ -52,7 +52,8 @@ preferences.json
 
 # Logs
 *.log
-logs/
+# Root-anchored: an unanchored logs/ also matched the features/logs source package.
+/logs/
 
 # Local environment
 local.properties

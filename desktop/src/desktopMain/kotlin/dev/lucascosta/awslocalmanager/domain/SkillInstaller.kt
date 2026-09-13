@@ -6,16 +6,10 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.SKILL_BLOCK_NAMESPA
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SKILL_MANIFEST_FILENAME
 import dev.lucascosta.awslocalmanager.constants.AppConstants.USER_HOME
 import dev.lucascosta.awslocalmanager.data.model.skill.AgentTarget
+import dev.lucascosta.awslocalmanager.data.model.skill.LegacyInstallMode
 import dev.lucascosta.awslocalmanager.data.model.skill.SkillCatalogEntry
-import dev.lucascosta.awslocalmanager.data.model.skill.SkillInstallMode
 import java.io.File
 
-/**
- * Writes skills into the agent tools installed for the current user.
- *
- * Everything it touches lives under the user home. Shared instruction files are edited through a
- * delimited block, so reinstalling replaces only that block and the rest of the file is preserved.
- */
 class SkillInstaller(
     private val homeDir: File = File(System.getProperty(USER_HOME) ?: EMPTY_STRING),
 ) {
@@ -38,24 +32,31 @@ class SkillInstaller(
     fun installPath(
         entry: SkillCatalogEntry,
         target: AgentTarget,
-    ): File =
-        when (target.mode) {
-            SkillInstallMode.SKILL_DIRECTORY -> File(homeDir, "${target.relativePath}/${entry.id}/$SKILL_MANIFEST_FILENAME")
-            SkillInstallMode.RULE_FILE -> File(homeDir, "${target.relativePath}/${entry.id}.${target.fileExtension}")
-            SkillInstallMode.INSTRUCTION_FILE -> File(homeDir, target.relativePath)
-        }
+    ): File = File(homeDir, "${target.skillsPath}/${entry.id}/$SKILL_MANIFEST_FILENAME")
+
+    fun invocation(
+        entry: SkillCatalogEntry,
+        target: AgentTarget,
+    ): String = target.invocation.replace("{skill}", entry.id)
 
     fun isInstalled(
         entry: SkillCatalogEntry,
         target: AgentTarget,
-    ): Boolean {
-        val file = installPath(entry, target)
-        if (!file.isFile) {
-            return false
-        }
-        return when (target.mode) {
-            SkillInstallMode.INSTRUCTION_FILE -> file.readText().contains(beginMarker(entry.id))
-            else -> true
+    ): Boolean = installPath(entry, target).isFile
+
+    fun legacyInstall(
+        entry: SkillCatalogEntry,
+        target: AgentTarget,
+    ): File? {
+        val legacy = target.legacy ?: return null
+        return when (legacy.mode) {
+            LegacyInstallMode.RULE_FILE ->
+                File(homeDir, "${legacy.relativePath}/${entry.id}.${legacy.fileExtension}").takeIf { it.isFile }
+
+            LegacyInstallMode.INSTRUCTION_FILE ->
+                File(homeDir, legacy.relativePath).takeIf { file ->
+                    runCatching { file.isFile && file.readText().contains(beginMarker(entry.id)) }.getOrDefault(false)
+                }
         }
     }
 
@@ -67,11 +68,8 @@ class SkillInstaller(
         runCatching {
             val file = installPath(entry, target)
             file.parentFile?.mkdirs()
-            when (target.mode) {
-                SkillInstallMode.SKILL_DIRECTORY -> file.writeText(content)
-                SkillInstallMode.RULE_FILE -> file.writeText(ruleFileContent(entry, content))
-                SkillInstallMode.INSTRUCTION_FILE -> writeBlock(file, entry, content)
-            }
+            file.writeText(manifest(entry, content))
+            removeLegacy(entry, target)
             file
         }
 
@@ -81,34 +79,41 @@ class SkillInstaller(
     ): Result<File> =
         runCatching {
             val file = installPath(entry, target)
-            when (target.mode) {
-                SkillInstallMode.SKILL_DIRECTORY -> file.parentFile?.deleteRecursively()
-                SkillInstallMode.RULE_FILE -> file.delete()
-                SkillInstallMode.INSTRUCTION_FILE -> removeBlock(file, entry)
-            }
+            file.parentFile?.deleteRecursively()
+            removeLegacy(entry, target)
             file
         }
 
-    private fun writeBlock(
-        file: File,
+    private fun manifest(
         entry: SkillCatalogEntry,
         content: String,
+    ): String {
+        val body = content.trim()
+        if (body.startsWith(FRONTMATTER_FENCE)) {
+            return body + "\n"
+        }
+        return buildString {
+            append("$FRONTMATTER_FENCE\n")
+            append("name: ${entry.id}\n")
+            append("description: ${entry.description.replace('\n', ' ')}\n")
+            append("$FRONTMATTER_FENCE\n\n")
+            append(body)
+            append("\n")
+        }
+    }
+
+    private fun removeLegacy(
+        entry: SkillCatalogEntry,
+        target: AgentTarget,
     ) {
-        val existing = if (file.isFile) file.readText() else EMPTY_STRING
-        backup(file, existing)
-        val stripped = blockRegex(entry.id).replace(existing, EMPTY_STRING).trimEnd()
-        val block =
-            buildString {
-                append(beginMarker(entry.id))
-                append(" (v${entry.version}) -->\n")
-                append("## ${entry.name}\n\n")
-                append(stripFrontmatter(content).trim())
-                append("\n")
-                append(endMarker(entry.id))
-                append("\n")
-            }
-        val separator = if (stripped.isEmpty()) EMPTY_STRING else "\n\n"
-        file.writeText(stripped + separator + block)
+        val legacy = target.legacy ?: return
+        when (legacy.mode) {
+            LegacyInstallMode.RULE_FILE ->
+                File(homeDir, "${legacy.relativePath}/${entry.id}.${legacy.fileExtension}").delete()
+
+            LegacyInstallMode.INSTRUCTION_FILE ->
+                removeBlock(File(homeDir, legacy.relativePath), entry)
+        }
     }
 
     private fun removeBlock(
@@ -119,6 +124,9 @@ class SkillInstaller(
             return
         }
         val existing = file.readText()
+        if (!existing.contains(beginMarker(entry.id))) {
+            return
+        }
         backup(file, existing)
         val cleaned = blockRegex(entry.id).replace(existing, EMPTY_STRING).trimEnd()
         file.writeText(if (cleaned.isEmpty()) EMPTY_STRING else cleaned + "\n")
@@ -131,35 +139,5 @@ class SkillInstaller(
         if (existing.isNotEmpty()) {
             File(file.parentFile, file.name + SKILL_BACKUP_SUFFIX).writeText(existing)
         }
-    }
-
-    private fun ruleFileContent(
-        entry: SkillCatalogEntry,
-        content: String,
-    ): String =
-        buildString {
-            append("$FRONTMATTER_FENCE\n")
-            append("description: ${entry.description}\n")
-            append("alwaysApply: false\n")
-            append("$FRONTMATTER_FENCE\n\n")
-            append("# ${entry.name}\n\n")
-            append(stripFrontmatter(content).trim())
-            append("\n")
-        }
-
-    private fun stripFrontmatter(content: String): String {
-        val trimmed = content.trimStart()
-        if (!trimmed.startsWith(FRONTMATTER_FENCE)) {
-            return content
-        }
-        val afterOpening = trimmed.removePrefix(FRONTMATTER_FENCE)
-        val closingIndex = afterOpening.indexOf("\n$FRONTMATTER_FENCE")
-        if (closingIndex == -1) {
-            return content
-        }
-        return afterOpening
-            .substring(closingIndex)
-            .removePrefix("\n$FRONTMATTER_FENCE")
-            .trimStart()
     }
 }
