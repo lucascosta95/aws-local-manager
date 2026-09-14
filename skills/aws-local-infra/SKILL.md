@@ -1,6 +1,6 @@
 ---
 name: aws-local-infra
-description: Sweep the open project for the AWS services it already uses, reading its code, configuration and .env files, then create or repair the infra/ folder that AWS Local Manager reads so the project can be debugged against a local AWS emulator. Use when the user wants to run or debug their service against local SQS, SNS, S3, DynamoDB, Step Functions, ElastiCache, SSM Parameter Store or MSK (Kafka), mentions AWS Local Manager or Floci, or asks to create, fix or extend infra/, aws-local.config.json, the .tf templates or payloads.json.
+description: Sweep the open project for the AWS services it already uses, reading its code, configuration and .env files, then create or repair the infra/ folder that AWS Local Manager reads so the project can be debugged against a local AWS emulator. Use when the user wants to run or debug their service against local SQS, SNS, S3, DynamoDB, Step Functions, ElastiCache, SSM Parameter Store, MSK (Kafka) or Glue Schema Registry, mentions AWS Local Manager or Floci, or asks to create, fix or extend infra/, aws-local.config.json, the .tf templates or payloads.json.
 ---
 
 # AWS Local Manager infrastructure
@@ -110,6 +110,7 @@ all: it is the real deployed infrastructure. Take the names from it, but do not 
 | `ssm`, `getParameter`, a `/path/like/this` config key | `aws_ssm_parameter` |
 | `bootstrap.servers`, `@KafkaListener`, `KafkaTemplate`, kafkajs, confluent-kafka | one `aws_msk_cluster` |
 | each topic the code produces to or consumes from | `aws_msk_topic` pointing at that cluster |
+| `schema-registry-serde`, `AWSKafkaAvroSerializer`, `registry.name` | `aws_glue_registry` plus one `aws_glue_schema` per schema |
 
 Only the types above exist in AWS Local Manager. When the project uses something else, such
 as Kinesis, EventBridge or Secrets Manager, say so plainly and leave it out instead of inventing a
@@ -320,6 +321,36 @@ Docker network (`networks: aws-local-manager: external: true` in Compose) and us
 `floci-msk-<id>:9092` address the Inspector shows. Do not use the address returned by
 `get-bootstrap-brokers`: it only works for the first connection.
 
+When the code uses the Confluent serializers (`kafka-avro-serializer`, `schema.registry.url`),
+there is nothing to declare: each cluster already runs a Confluent-compatible registry. Tell the
+user to set `schema.registry.url` to `http://localhost:18081` for a service on the host, or
+`http://floci-msk-<id>:8081` from a container on the network.
+
+### Glue Schema Registry
+
+Use this when the code serializes with the AWS Glue SerDe. `schema_name`, `data_format`
+(`AVRO`, `JSON`, `PROTOBUF`) and `schema_definition` are required. Prefer `file()` pointing at the
+schema file the project already has, so the definition is not duplicated; a heredoc or a quoted
+string also works, but `jsonencode()` is not read.
+
+```hcl
+resource "aws_glue_registry" "payments" {
+  registry_name = "payments"
+}
+
+resource "aws_glue_schema" "payment_approved" {
+  schema_name       = "payment-approved"
+  registry_arn      = aws_glue_registry.payments.arn
+  data_format       = "AVRO"
+  compatibility     = "BACKWARD"
+  schema_definition = file("${path.module}/../src/main/avro/payment-approved.avsc")
+}
+```
+
+The SerDe reaches the registry through the AWS endpoint: in the local profile set its
+`endpoint` property to `http://localhost:4566` and `region` to `us-east-1`, with the `test`
+credentials.
+
 ## Step 5: payloads.json (optional)
 
 Saved payloads for the Running screen. Every entry requires `name`, `queue` and `payload`.
@@ -368,6 +399,7 @@ Confirm each item:
 - Every `aws_s3_bucket` label matches its `bucket` value, with `_` in place of `-`.
 - Every `aws_ssm_parameter` block has a `name`, otherwise the app skips it.
 - Every `aws_msk_topic` has a `name` and a `cluster_arn` that points at a declared `aws_msk_cluster`.
+- Every `aws_glue_schema` has `schema_name`, `data_format` and a `schema_definition` that is not `jsonencode()`.
 - Every `.tf` file is directly in `infra/`, none in a subfolder.
 - Every `payloads.json` entry has `name`, `queue` and `payload`.
 - Resource names match the names the application code actually uses.

@@ -7,7 +7,7 @@
       "description": "Sweeps the project for the AWS services it already uses, reading the code, the configuration and the .env files, then creates or repairs the infra/ folder that AWS Local Manager reads so the project can be debugged against the local AWS emulator.",
       "version": "1.3.0",
       "path": "aws-local-infra/SKILL.md",
-      "sha256": "5de0938f68668f56f96ee73b7d560974ab87f56d5986f48f12e2fb66c6715d8b",
+      "sha256": "8fdf06c3a33e4d340c92fb9896c5c14f5c43648a157cb4a6e2f29dd848384a21",
       "tags": [
         "terraform",
         "setup",
@@ -18,7 +18,8 @@
         "elasticache",
         "stepfunctions",
         "ssm",
-        "msk"
+        "msk",
+        "glue"
       ],
       "translations": {
         "pt-BR": {

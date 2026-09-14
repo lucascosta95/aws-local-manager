@@ -25,16 +25,16 @@ AWS Local Manager provides a visual interface that integrates directly with your
 
 - 🩺 **Real-time health dashboard** — monitor all emulated AWS services at a glance, with configurable polling interval
 - 🏗️ **Infrastructure from Terraform** — read your `.tf` files and provision resources directly into the emulator without running `terraform apply`
-- ⚡ **Quick Create** — spin up SQS queues, SNS topics, S3 buckets, DynamoDB tables, SSM parameters, and MSK clusters and topics without Terraform
+- ⚡ **Quick Create** — spin up SQS queues, SNS topics, S3 buckets, DynamoDB tables, SSM parameters, MSK clusters and topics, and Glue schema registries and schemas without Terraform
 - 📤 **Message publishing** — send JSON messages to SQS, SNS, DynamoDB, Step Functions, and Kafka topics (MSK); upload files to S3
 - 🔁 **Step Functions execution** — trigger state machine executions with custom JSON input
 - 💾 **Saved payloads** — store and reuse common message payloads per project via `payloads.json`
 - 🌍 **i18n** — interface available in English and Portuguese (pt-BR)
 - 🎨 **Light and dark theme**
-- 🔍 **Inspector** — browse and inspect the content of SQS queues, Step Functions executions, DynamoDB tables, S3 buckets, ElastiCache keys, SSM parameters, and MSK topics, messages and consumer groups directly from the app
+- 🔍 **Inspector** — browse and inspect the content of SQS queues, Step Functions executions, DynamoDB tables, S3 buckets, ElastiCache keys, SSM parameters, MSK topics, messages, consumer groups and schemas, and Glue Schema Registry schemas and versions directly from the app
 - 🔄 **Auto-update** via GitHub Releases
 
-**Supported services:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache · SSM Parameter Store · MSK (Kafka)
+**Supported services:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache · SSM Parameter Store · MSK (Kafka) · Glue Schema Registry
 
 ---
 
@@ -434,7 +434,51 @@ networks:
     external: true
 ```
 
-> ⚠️ Nothing survives an emulator restart. Clusters, topics and messages have to be applied again.
+**Schema Registry (Confluent-compatible).** Every MSK cluster also runs a schema registry that speaks the Confluent Schema Registry API, so `io.confluent:kafka-avro-serializer` and friends work unchanged. The app exposes it the same way as the broker:
+
+| Where the application runs | `schema.registry.url` |
+|---|---|
+| On your machine, e.g. started from the IDE | `http://localhost:18081` — the next clusters get `18082`, `18083`, … |
+| In a container on the `aws-local-manager` network | `http://floci-msk-<id>:8081` |
+
+Schemas are registered by the application itself (`auto.register.schemas`) or through the registry's REST API; there is no Terraform resource for them. The Inspector lists every subject with its latest version, and copying a row copies the schema. If your application uses AWS Glue Schema Registry instead, see the next section.
+
+> ⚠️ Nothing survives an emulator restart. Clusters, topics, schemas and messages have to be applied again.
+
+#### Glue Schema Registry
+
+For applications that serialize Kafka records with the AWS Glue Schema Registry SerDe (`software.amazon.glue:schema-registry-serde`). A schema points at its registry through `registry_arn`, either as a reference to an `aws_glue_registry` in any file of the folder or as a literal ARN; without `registry_arn` it goes into `default-registry`, as on AWS.
+
+```hcl
+resource "aws_glue_registry" "payments" {
+  registry_name = "payments"
+}
+
+resource "aws_glue_schema" "payment_approved" {
+  schema_name       = "payment-approved"
+  registry_arn      = aws_glue_registry.payments.arn
+  data_format       = "AVRO"
+  compatibility     = "BACKWARD"
+  schema_definition = file("${path.module}/schemas/payment-approved.avsc")
+}
+```
+
+- `schema_name`, `data_format` (`AVRO`, `JSON` or `PROTOBUF`) and `schema_definition` are required; a block missing one of them is skipped. `compatibility` defaults to `BACKWARD`.
+- `schema_definition` can be a quoted string, a heredoc (`<<EOF` or `<<-EOF`) or `file("...")` with a path relative to `infra/`, optionally prefixed by `${path.module}/`. `jsonencode(...)` is **not** evaluated.
+- Applying again is safe: an unchanged definition keeps its version, and an edited one is registered as a new version, subject to the compatibility mode.
+- The Inspector lists registries and schemas, and shows every version of a schema with its definition.
+
+The registry lives behind the AWS endpoint, so the application reaches it like SQS or S3 — no proxy involved. Point the SerDe at the emulator in your local profile:
+
+```properties
+endpoint=http://localhost:4566
+region=us-east-1
+registry.name=payments
+dataFormat=AVRO
+schemaAutoRegistrationEnabled=false
+```
+
+together with `AWS_ACCESS_KEY_ID=test` and `AWS_SECRET_ACCESS_KEY=test` in the environment.
 
 #### What the app reads from each type
 
@@ -450,6 +494,8 @@ networks:
 | `aws_ssm_parameter` | `name` (required), `value`, `type` | Parameter written with `put-parameter --overwrite` |
 | `aws_msk_cluster` | `cluster_name`, `kafka_version`, `number_of_broker_nodes`, `instance_type` | Cluster backed by a single Redpanda broker |
 | `aws_msk_topic` | `name` (required), `cluster_arn` (required), `partition_count` | Topic with replication factor `1` |
+| `aws_glue_registry` | `registry_name` | Schema registry |
+| `aws_glue_schema` | `schema_name`, `data_format`, `schema_definition` (all required), `registry_arn`, `compatibility` | Schema, or a new version of it when the definition changed |
 
 ### payloads.json
 
