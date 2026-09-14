@@ -25,16 +25,16 @@ AWS Local Manager provides a visual interface that integrates directly with your
 
 - 🩺 **Real-time health dashboard** — monitor all emulated AWS services at a glance, with configurable polling interval
 - 🏗️ **Infrastructure from Terraform** — read your `.tf` files and provision resources directly into the emulator without running `terraform apply`
-- ⚡ **Quick Create** — spin up SQS queues, SNS topics, S3 buckets, DynamoDB tables, and SSM parameters without Terraform
-- 📤 **Message publishing** — send JSON messages to SQS, SNS, DynamoDB, and Step Functions; upload files to S3
+- ⚡ **Quick Create** — spin up SQS queues, SNS topics, S3 buckets, DynamoDB tables, SSM parameters, and MSK clusters and topics without Terraform
+- 📤 **Message publishing** — send JSON messages to SQS, SNS, DynamoDB, Step Functions, and Kafka topics (MSK); upload files to S3
 - 🔁 **Step Functions execution** — trigger state machine executions with custom JSON input
 - 💾 **Saved payloads** — store and reuse common message payloads per project via `payloads.json`
 - 🌍 **i18n** — interface available in English and Portuguese (pt-BR)
 - 🎨 **Light and dark theme**
-- 🔍 **Inspector** — browse and inspect the content of SQS queues, Step Functions executions, DynamoDB tables, S3 buckets, ElastiCache keys, and SSM parameters directly from the app
+- 🔍 **Inspector** — browse and inspect the content of SQS queues, Step Functions executions, DynamoDB tables, S3 buckets, ElastiCache keys, SSM parameters, and MSK topics, messages and consumer groups directly from the app
 - 🔄 **Auto-update** via GitHub Releases
 
-**Supported services:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache · SSM Parameter Store
+**Supported services:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache · SSM Parameter Store · MSK (Kafka)
 
 ---
 
@@ -67,6 +67,12 @@ keeps serving it to the container already created from it, so a plain `docker pu
 Fixing the image check downloads the supported version, removes the container the app created from
 the old image, and deletes the old image. Fixing the emulator check then recreates the container on
 the supported version. Everything removed is named in the fix log.
+
+The emulator container must also run on the `aws-local-manager` Docker network, with
+`FLOCI_SERVICES_DOCKER_NETWORK` and `FLOCI_SERVICES_MSK_DEFAULT_IMAGE` set, so the Kafka brokers it starts
+can resolve their own names. A container created by an older release lacks that, and Setup reports the
+emulator as **Outdated** for this reason too. Fixing it creates the network when missing and recreates the
+container. The emulator keeps no state, so recreating it drops every resource created so far.
 
 ---
 
@@ -212,7 +218,7 @@ How the parser reads a file:
 
 - Only `.tf` files placed **directly** inside `infra/` are read; subdirectories are skipped.
 - Every resource must be a top-level block: `resource "<aws_type>" "<label>" { ... }`. The label accepts letters, digits and `_` only.
-- The AWS name comes from the `name` attribute of the block. When it is absent, the app falls back to the label with `_` replaced by `-`. The exception is `aws_ssm_parameter`, which is skipped when `name` is missing.
+- The AWS name comes from the `name` attribute of the block. When it is absent, the app falls back to the label with `_` replaced by `-`. The exceptions are `aws_ssm_parameter` and `aws_msk_topic`, which are skipped when `name` is missing, and `aws_msk_cluster`, which reads `cluster_name`.
 - Values must be literal strings. `var.*`, `local.*` and `${...}` interpolations are **not** resolved.
 - Any other attribute is ignored by the app and harmless to keep, so the same file still works with real Terraform.
 
@@ -370,6 +376,66 @@ The app sends `name`, `value` and `type` to the emulator with `put-parameter --o
 
 > ⚠️ A `SecureString` value written into a `.tf` file is a secret stored in plain text in your repository, and the Inspector shows it decrypted. Keep local debugging on `String`.
 
+#### Amazon MSK (Kafka)
+
+The emulator backs every MSK cluster with a [Redpanda](https://redpanda.com) container, which speaks the Kafka protocol. A topic points at its cluster through `cluster_arn`, either as a reference to an `aws_msk_cluster` declared in any file of the folder or as a literal ARN:
+
+```hcl
+resource "aws_msk_cluster" "orders" {
+  cluster_name           = "orders-kafka"
+  kafka_version          = "3.6.0"
+  number_of_broker_nodes = 1
+
+  broker_node_group_info {
+    instance_type  = "kafka.t3.small"
+    client_subnets = ["subnet-local"]
+  }
+}
+
+resource "aws_msk_topic" "order_created" {
+  name               = "order-created"
+  cluster_arn        = aws_msk_cluster.orders.arn
+  partition_count    = 3
+  replication_factor = 1
+}
+```
+
+- The cluster is created with `kafka_version`, `number_of_broker_nodes` and `instance_type`. Subnets, security groups, encryption, authentication, logging and monitoring are ignored, so references such as `aws_subnet.a.id` are harmless.
+- Whatever `number_of_broker_nodes` says, the emulator runs **one** broker. Topics are therefore created with a replication factor of `1`, and `configs` is not applied.
+- A topic whose `cluster_arn` points to a cluster that is not in the folder is skipped.
+- The first cluster downloads the broker image (about 125 MB), so it can take a minute. Topics are created once their cluster is active.
+- Topics appear on the Running screen as `<cluster>/<topic>`. That is also the name to use in `payloads.json`, where the topic name alone works too.
+
+**Connecting your application.** The broker advertises itself as `floci-msk-<id>:9092`, a name that only resolves inside the `aws-local-manager` Docker network, so a client outside that network cannot follow it. The app works around this by starting a proxy container (`grepplabs/kafka-proxy`) for every active cluster, which rewrites that address to a port on `localhost`. The Inspector shows both addresses, with a copy button:
+
+| Where the application runs | `bootstrap.servers` |
+|---|---|
+| On your machine, e.g. started from the IDE | `localhost:19092` — the next clusters get `19093`, `19094`, … |
+| In a container on the `aws-local-manager` network | `floci-msk-<id>:9092` |
+
+- The proxy starts within one polling interval after the cluster becomes active, and the first one downloads the proxy image (about 300 MB). It is removed when the cluster is deleted or the emulator stops.
+- Ports are handed out in alphabetical order of cluster name, and a cluster that is recreated keeps its port while the app is running. With a single cluster the address is always `localhost:19092`.
+- Proxies keep running after the app is closed, so a service started from the IDE stays connected. The next time the app runs, it removes the ones whose cluster is gone.
+- The ports are published on `127.0.0.1` only.
+
+For an application in a container, join the network in Compose:
+
+```yaml
+services:
+  orders-service:
+    build: .
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: floci-msk-a1b2c3:9092
+    networks:
+      - aws-local-manager
+
+networks:
+  aws-local-manager:
+    external: true
+```
+
+> ⚠️ Nothing survives an emulator restart. Clusters, topics and messages have to be applied again.
+
 #### What the app reads from each type
 
 | Terraform type | Attributes used | Created in the emulator as |
@@ -382,6 +448,8 @@ The app sends `name`, `value` and `type` to the emulator with `put-parameter --o
 | `aws_sfn_state_machine` | `name` | State machine with a single `Pass` state |
 | `aws_elasticache_cluster` | `cluster_id`, `engine`, `node_type`, `num_cache_nodes` (quoted) | Replication group (redis) or cache cluster (memcached) |
 | `aws_ssm_parameter` | `name` (required), `value`, `type` | Parameter written with `put-parameter --overwrite` |
+| `aws_msk_cluster` | `cluster_name`, `kafka_version`, `number_of_broker_nodes`, `instance_type` | Cluster backed by a single Redpanda broker |
+| `aws_msk_topic` | `name` (required), `cluster_arn` (required), `partition_count` | Topic with replication factor `1` |
 
 ### payloads.json
 
