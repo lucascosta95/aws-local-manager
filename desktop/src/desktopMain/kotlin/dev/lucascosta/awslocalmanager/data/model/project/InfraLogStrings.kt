@@ -12,6 +12,7 @@ data class InfraLogStrings(
     val subscribeErrorFmt: String,
     val filterWarningFmt: String,
     val filterScopeWarningFmt: String,
+    val waitingClusterFmt: String,
 ) {
     companion object {
         fun from(strings: Strings) =
@@ -25,6 +26,7 @@ data class InfraLogStrings(
                 subscribeErrorFmt = strings.infraLogSubscribeErrorFmt,
                 filterWarningFmt = strings.infraLogFilterWarningFmt,
                 filterScopeWarningFmt = strings.infraLogFilterScopeWarningFmt,
+                waitingClusterFmt = strings.infraLogWaitingClusterFmt,
             )
     }
 }

@@ -34,6 +34,8 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.WINDOW_WIDTH_DP
 import dev.lucascosta.awslocalmanager.data.model.aws.ResourceRegistry
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskClusterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsSubscriptionResource
@@ -44,12 +46,14 @@ import dev.lucascosta.awslocalmanager.data.remote.EmulatorClient
 import dev.lucascosta.awslocalmanager.data.repository.AppPreferences
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import dev.lucascosta.awslocalmanager.di.appModules
+import dev.lucascosta.awslocalmanager.domain.KafkaHostProxySupervisor
 import dev.lucascosta.awslocalmanager.features.dashboard.DashboardViewModel
 import dev.lucascosta.awslocalmanager.features.infrastructure.InfrastructureViewModel
 import dev.lucascosta.awslocalmanager.features.inspector.InspectorViewModel
 import dev.lucascosta.awslocalmanager.features.inspector.handler.DynamoInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.ElastiCacheInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.InspectorHandlerRegistry
+import dev.lucascosta.awslocalmanager.features.inspector.handler.MskInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.S3InspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SsmInspectorHandler
@@ -95,6 +99,8 @@ fun main() {
         SnsSubscriptionResource,
         ElastiCacheResource,
         SsmParameterResource,
+        MskClusterResource,
+        MskTopicResource,
     )
 
     InspectorHandlerRegistry.register(SqsInspectorHandler())
@@ -103,6 +109,7 @@ fun main() {
     InspectorHandlerRegistry.register(S3InspectorHandler())
     InspectorHandlerRegistry.register(ElastiCacheInspectorHandler())
     InspectorHandlerRegistry.register(SsmInspectorHandler())
+    InspectorHandlerRegistry.register(MskInspectorHandler())
 
     val appIcon = loadAppIcon()
 
@@ -150,6 +157,7 @@ fun AppRoot() {
     val preferencesRepository: PreferencesRepository = koinInject()
     val settingsViewModel: SettingsViewModel = koinInject()
     val updateViewModel: UpdateViewModel = koinInject()
+    val kafkaHostProxySupervisor: KafkaHostProxySupervisor = koinInject()
 
     val allViewModels =
         listOf(
@@ -167,7 +175,9 @@ fun AppRoot() {
         )
 
     DisposableEffect(Unit) {
+        kafkaHostProxySupervisor.start()
         onDispose {
+            kafkaHostProxySupervisor.stop()
             emulatorClient.close()
             allViewModels.forEach { it.onCleared() }
         }

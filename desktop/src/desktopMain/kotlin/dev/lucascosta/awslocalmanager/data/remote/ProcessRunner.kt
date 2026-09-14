@@ -53,6 +53,8 @@ object ProcessRunner {
                         }
                         .start()
 
+                process.outputStream.bufferedWriter().use { writer -> config.stdin?.let(writer::write) }
+
                 val stdout: String
                 val stderr: String
 

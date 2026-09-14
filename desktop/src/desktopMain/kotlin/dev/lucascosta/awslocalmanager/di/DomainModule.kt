@@ -4,6 +4,9 @@ import dev.lucascosta.awslocalmanager.domain.AssociateResourcesUseCase
 import dev.lucascosta.awslocalmanager.domain.AwsResourceChecker
 import dev.lucascosta.awslocalmanager.domain.DynamoDbHealthProbe
 import dev.lucascosta.awslocalmanager.domain.ElastiCacheHealthProbe
+import dev.lucascosta.awslocalmanager.domain.KafkaHostProxySupervisor
+import dev.lucascosta.awslocalmanager.domain.MskHealthProbe
+import dev.lucascosta.awslocalmanager.domain.MskTopicProvisioner
 import dev.lucascosta.awslocalmanager.domain.S3HealthProbe
 import dev.lucascosta.awslocalmanager.domain.ServiceStatusChecker
 import dev.lucascosta.awslocalmanager.domain.SkillInstaller
@@ -29,6 +32,7 @@ val domainModule =
                         StepFunctionsHealthProbe(),
                         ElastiCacheHealthProbe(),
                         SsmHealthProbe(),
+                        MskHealthProbe(),
                     ),
             )
         }
@@ -36,4 +40,6 @@ val domainModule =
         single { AwsResourceChecker(get()) }
         single { AssociateResourcesUseCase() }
         single { SkillInstaller() }
+        single { MskTopicProvisioner(get()) }
+        single { KafkaHostProxySupervisor(get(), get()) }
     }

@@ -28,6 +28,7 @@ import aws_local_manager.desktop.generated.resources.aws_iam_identity_center
 import aws_local_manager.desktop.generated.resources.aws_kinesis
 import aws_local_manager.desktop.generated.resources.aws_kms
 import aws_local_manager.desktop.generated.resources.aws_lambda
+import aws_local_manager.desktop.generated.resources.aws_msk
 import aws_local_manager.desktop.generated.resources.aws_opensearch_service
 import aws_local_manager.desktop.generated.resources.aws_rds
 import aws_local_manager.desktop.generated.resources.aws_redshift
@@ -74,6 +75,7 @@ enum class AwsServiceType(val icon: DrawableResource, vararg val aliases: String
     KINESIS(Res.drawable.aws_kinesis),
     KMS(Res.drawable.aws_kms),
     LAMBDA(Res.drawable.aws_lambda),
+    MSK(Res.drawable.aws_msk, "KAFKA"),
     RDS(Res.drawable.aws_rds),
     REDSHIFT(Res.drawable.aws_redshift),
     RESOURCEGROUPS(Res.drawable.aws_resource_explorer, "RESOURCE-GROUPS", "RESOURCEGROUPSTAGGINGAPI"),

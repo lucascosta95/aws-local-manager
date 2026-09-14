@@ -20,7 +20,7 @@ val presentationModule =
         single { SetupViewModel(get(), get()) }
         single { LogsViewModel() }
         single { ProjectSelectorViewModel(get(), get(), get(), get()) }
-        single { InfrastructureViewModel(get(), get(), get(), get()) }
+        single { InfrastructureViewModel(get(), get(), get(), get(), get(), get()) }
         single {
             RunningViewModel(
                 preferencesRepository = get(),
@@ -32,7 +32,7 @@ val presentationModule =
                 associateResources = get(),
             )
         }
-        single { QuickViewModel(get()) }
+        single { QuickViewModel(get(), get(), get()) }
         single { UpdateViewModel(get(), get()) }
         single { InspectorViewModel(get()) }
         single { SkillsViewModel(get(), get(), get()) }

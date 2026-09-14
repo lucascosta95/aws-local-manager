@@ -9,6 +9,8 @@ import dev.lucascosta.awslocalmanager.data.model.project.InfraProject
 import dev.lucascosta.awslocalmanager.data.model.project.ProjectConfig
 import dev.lucascosta.awslocalmanager.data.model.project.TerraformResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
+import dev.lucascosta.awslocalmanager.data.model.resources.MskClusterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
 import kotlinx.serialization.json.Json
@@ -24,6 +26,8 @@ class TerraformReader {
         private val snsSubscriptionPattern = Regex("""resource\s+"aws_sns_topic_subscription"\s+"(\w+)"\s*\{""")
         private val rawDeliveryPattern = Regex("""raw_message_delivery\s*=\s*true""")
         private val filterPolicyPattern = Regex("""filter_policy\s*=\s*jsonencode\s*\(\s*\{""")
+        private val mskClusterReferencePattern = Regex("""^aws_msk_cluster\.(\w+)\.arn$""")
+        private val mskClusterArnPattern = Regex("""^arn:aws:kafka:[^:]*:[^:]*:cluster/([^/]+)/""")
     }
 
     fun findProjects(rootDir: File): List<InfraProject> {
@@ -48,7 +52,7 @@ class TerraformReader {
             return emptyList()
         }
 
-        return tfFiles.flatMap { parseResourcesFromFile(it) }.sortedBy { it.tfLabel }
+        return resolveMskTopics(tfFiles.flatMap { parseResourcesFromFile(it) }).sortedBy { it.tfLabel }
     }
 
     private fun parseProjectDirectory(dir: File): InfraProject? {
@@ -97,6 +101,8 @@ class TerraformReader {
         when (awsPrefix) {
             "aws_elasticache_cluster" -> parseElastiCacheAttributes(tfLabel, blockContent)
             "aws_ssm_parameter" -> parseSsmParameterAttributes(blockContent)
+            "aws_msk_cluster" -> parseMskClusterAttributes(tfLabel, blockContent)
+            "aws_msk_topic" -> parseMskTopicAttributes(blockContent)
             else -> (namePattern.find(blockContent)?.groupValues?.get(1) ?: tfLabel.replace("_", "-")) to emptyMap()
         }
 
@@ -130,6 +136,62 @@ class TerraformReader {
                 SsmParameterResource.VALUE_PROPERTY to value,
                 SsmParameterResource.TYPE_PROPERTY to type,
             )
+    }
+
+    private fun parseMskClusterAttributes(
+        tfLabel: String,
+        blockContent: String,
+    ): Pair<String, Map<String, String>> {
+        val clusterName = extractQuotedAttribute(blockContent, "cluster_name") ?: tfLabel.replace("_", "-")
+        val kafkaVersion = MskClusterResource.KAFKA_VERSION_PROPERTY
+        val brokerNodes = MskClusterResource.BROKER_NODES_PROPERTY
+        val instanceType = MskClusterResource.INSTANCE_TYPE_PROPERTY
+        return clusterName to
+            mapOf(
+                kafkaVersion to (extractQuotedAttribute(blockContent, kafkaVersion) ?: MskClusterResource.DEFAULT_KAFKA_VERSION),
+                brokerNodes to (extractNumericAttribute(blockContent, brokerNodes) ?: MskClusterResource.DEFAULT_BROKER_NODES),
+                instanceType to (extractQuotedAttribute(blockContent, instanceType) ?: MskClusterResource.DEFAULT_INSTANCE_TYPE),
+            )
+    }
+
+    private fun parseMskTopicAttributes(blockContent: String): Pair<String, Map<String, String>>? {
+        val topicName = namePattern.find(blockContent)?.groupValues?.get(1) ?: return null
+        val clusterReference = extractAttributeValue(blockContent, MskTopicResource.CLUSTER_REFERENCE_PROPERTY) ?: return null
+        val partitions =
+            extractNumericAttribute(blockContent, MskTopicResource.PARTITIONS_PROPERTY)
+                ?: MskTopicResource.DEFAULT_PARTITIONS.toString()
+        return topicName to
+            mapOf(
+                MskTopicResource.CLUSTER_REFERENCE_PROPERTY to clusterReference,
+                MskTopicResource.PARTITIONS_PROPERTY to partitions,
+            )
+    }
+
+    // A topic points at its cluster by Terraform reference, possibly across files, so its cluster name is resolved last.
+    private fun resolveMskTopics(resources: List<TerraformResource>): List<TerraformResource> {
+        val clusterNamesByLabel =
+            resources
+                .filter { it.rawAwsType == MskClusterResource.terraformPrefix }
+                .associate { it.tfLabel to it.awsName }
+
+        return resources.mapNotNull { resource ->
+            if (resource.rawAwsType != MskTopicResource.terraformPrefix) return@mapNotNull resource
+            val reference = resource.extraProperties[MskTopicResource.CLUSTER_REFERENCE_PROPERTY].orEmpty()
+            val clusterName = resolveMskClusterName(reference, clusterNamesByLabel) ?: return@mapNotNull null
+            resource.copy(
+                awsName = MskTopicResource.qualifiedName(clusterName, resource.awsName),
+                extraProperties = resource.extraProperties + (MskTopicResource.CLUSTER_PROPERTY to clusterName),
+            )
+        }
+    }
+
+    private fun resolveMskClusterName(
+        reference: String,
+        clusterNamesByLabel: Map<String, String>,
+    ): String? {
+        val label = mskClusterReferencePattern.find(reference)?.groupValues?.get(1)
+        if (label != null) return clusterNamesByLabel[label]
+        return mskClusterArnPattern.find(reference)?.groupValues?.get(1)
     }
 
     private fun extractBlock(
@@ -209,6 +271,13 @@ class TerraformReader {
         key: String,
     ): String? =
         Regex("""^\s*${Regex.escape(key)}\s*=\s*"([^"]+)"""", RegexOption.MULTILINE)
+            .find(blockContent)?.groupValues?.get(1)
+
+    private fun extractNumericAttribute(
+        blockContent: String,
+        key: String,
+    ): String? =
+        Regex("""^\s*${Regex.escape(key)}\s*=\s*"?(\d+)"?\s*$""", RegexOption.MULTILINE)
             .find(blockContent)?.groupValues?.get(1)
 
     private fun extractFilterPolicy(blockContent: String): String? {

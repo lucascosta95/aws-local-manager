@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -41,6 +43,7 @@ import dev.lucascosta.awslocalmanager.data.model.aws.ResourceRegistry
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
@@ -48,6 +51,7 @@ import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import dev.lucascosta.awslocalmanager.theme.LocalAppColors
 import org.koin.compose.koinInject
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun QuickScreen(
     viewModel: QuickViewModel = koinInject(),
@@ -74,7 +78,7 @@ fun QuickScreen(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ResourceRegistry.all().filter { it.isQuickCreatable }.forEach { type ->
                     FilterChip(
                         selected = state.selectedType == type,
@@ -122,6 +126,15 @@ fun QuickScreen(
                         type = state.parameterType,
                         onValueChange = viewModel::setParameterValue,
                         onTypeChange = viewModel::setParameterType,
+                    )
+
+                MskTopicResource ->
+                    MskTopicOptions(
+                        clusters = state.mskClusters,
+                        selectedCluster = state.selectedMskCluster,
+                        partitions = state.topicPartitions,
+                        onClusterChange = viewModel::setMskCluster,
+                        onPartitionsChange = viewModel::setTopicPartitions,
                     )
 
                 else -> {}
@@ -289,6 +302,46 @@ private fun SsmParameterOptions(
                 )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MskTopicOptions(
+    clusters: List<String>,
+    selectedCluster: String?,
+    partitions: Int,
+    onClusterChange: (String) -> Unit,
+    onPartitionsChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val strings = LocalStrings.current
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(strings.quickMskCluster, style = MaterialTheme.typography.labelMedium)
+        if (clusters.isEmpty()) {
+            Text(
+                strings.quickMskNoClusters,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                clusters.forEach { cluster ->
+                    FilterChip(
+                        selected = selectedCluster == cluster,
+                        onClick = { onClusterChange(cluster) },
+                        label = { Text(cluster, style = MaterialTheme.typography.labelSmall) },
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = partitions.toString(),
+            onValueChange = { it.toIntOrNull()?.let { value -> onPartitionsChange(value.coerceIn(1, 100)) } },
+            label = { Text(strings.quickMskPartitions, style = MaterialTheme.typography.bodySmall) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

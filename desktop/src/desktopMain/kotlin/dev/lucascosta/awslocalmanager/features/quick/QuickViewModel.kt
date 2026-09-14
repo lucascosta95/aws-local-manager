@@ -2,6 +2,7 @@ package dev.lucascosta.awslocalmanager.features.quick
 
 import dev.lucascosta.awslocalmanager.BaseViewModel
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DLQ_SUFFIX
+import dev.lucascosta.awslocalmanager.constants.AppConstants.PROCESS_DEFAULT_TIMEOUT_SECONDS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SQS_DLQ_CREATION_DELAY_MS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SQS_DLQ_TARGET_ARN_KEY
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SQS_MAX_RECEIVE_COUNT_KEY
@@ -13,17 +14,22 @@ import dev.lucascosta.awslocalmanager.data.model.process.ProcessConfig
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskClusterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
 import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
+import dev.lucascosta.awslocalmanager.data.remote.AwsMskClient
 import dev.lucascosta.awslocalmanager.data.remote.ElastiCacheCommands
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorDefaults
 import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.remote.SsmCommands
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
+import dev.lucascosta.awslocalmanager.domain.KafkaHostProxySupervisor
+import dev.lucascosta.awslocalmanager.domain.MskTopicProvisioner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +47,9 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class QuickViewModel(
     private val preferencesRepository: PreferencesRepository,
+    private val mskTopicProvisioner: MskTopicProvisioner,
+    private val kafkaHostProxySupervisor: KafkaHostProxySupervisor,
+    private val mskClientFactory: (String) -> AwsMskClient = ::AwsMskClient,
 ) : BaseViewModel() {
     private val _state = MutableStateFlow(QuickUiState())
     val state: StateFlow<QuickUiState> = _state.asStateFlow()
@@ -49,6 +58,7 @@ class QuickViewModel(
 
     fun setType(type: AwsResourceDefinition) {
         _state.update { it.copy(selectedType = type) }
+        if (type == MskTopicResource) loadMskClusters()
     }
 
     fun setName(name: String) {
@@ -83,6 +93,27 @@ class QuickViewModel(
         _state.update { it.copy(parameterType = type) }
     }
 
+    fun setMskCluster(cluster: String) {
+        _state.update { it.copy(selectedMskCluster = cluster) }
+    }
+
+    fun setTopicPartitions(partitions: Int) {
+        _state.update { it.copy(topicPartitions = partitions) }
+    }
+
+    private fun loadMskClusters() {
+        scope.launch {
+            val endpoint = preferencesRepository.preferences.first().endpoint
+            val clusters = mskClientFactory(endpoint).listClusters().getOrElse { emptyList() }.map { it.name }
+            _state.update { state ->
+                state.copy(
+                    mskClusters = clusters,
+                    selectedMskCluster = state.selectedMskCluster?.takeIf { it in clusters } ?: clusters.firstOrNull(),
+                )
+            }
+        }
+    }
+
     fun create() {
         val currentState = _state.value
         if (!currentState.canCreate) return
@@ -93,7 +124,7 @@ class QuickViewModel(
             val timestamp = LocalTime.now().format(timeFormatter)
             val results: List<ResourceCreationResult> =
                 withContext(Dispatchers.IO) {
-                    runCatching { dispatchCreate(currentState, env) }
+                    runCatching { dispatchCreate(currentState, endpoint, env) }
                         .getOrElse { listOf(ResourceCreationResult(currentState.resourceName, false)) }
                 }
             val newItems =
@@ -106,11 +137,13 @@ class QuickViewModel(
                     )
                 }
             _state.update { it.copy(isCreating = false, history = newItems + it.history) }
+            kafkaHostProxySupervisor.requestReconcile()
         }
     }
 
     private suspend fun dispatchCreate(
         state: QuickUiState,
+        endpoint: String,
         env: Map<String, String>,
     ): List<ResourceCreationResult> =
         when (state.selectedType) {
@@ -120,6 +153,8 @@ class QuickViewModel(
             DynamoDbResource -> listOf(ResourceCreationResult(state.resourceName, createDynamoDB(state, env)))
             ElastiCacheResource -> listOf(ResourceCreationResult(state.resourceName, createElastiCache(state, env)))
             SsmParameterResource -> listOf(ResourceCreationResult(state.resourceName, createSsmParameter(state, env)))
+            MskClusterResource -> listOf(ResourceCreationResult(state.resourceName, createMskCluster(state, env)))
+            MskTopicResource -> listOf(createMskTopic(state, endpoint))
             else -> listOf(ResourceCreationResult(state.resourceName, false))
         }
 
@@ -174,10 +209,33 @@ class QuickViewModel(
             env,
         )
 
+    private suspend fun createMskCluster(
+        state: QuickUiState,
+        env: Map<String, String>,
+    ): Boolean =
+        runCommand(
+            MskClusterResource.createCommand(state.resourceName, emptyMap()),
+            env,
+            MskClusterResource.createTimeoutSeconds,
+        )
+
+    private suspend fun createMskTopic(
+        state: QuickUiState,
+        endpoint: String,
+    ): ResourceCreationResult {
+        val cluster = state.selectedMskCluster ?: return ResourceCreationResult(state.resourceName, false)
+        val success = mskTopicProvisioner.createTopic(endpoint, cluster, state.resourceName, state.topicPartitions).isSuccess
+        return ResourceCreationResult(MskTopicResource.qualifiedName(cluster, state.resourceName), success)
+    }
+
     private suspend fun runCommand(
         command: List<String>,
         env: Map<String, String>,
-    ): Boolean = ProcessRunner.run(command, ProcessConfig(envVars = env)).getOrElse { return false }.exitCode == 0
+        timeoutSeconds: Long = PROCESS_DEFAULT_TIMEOUT_SECONDS,
+    ): Boolean =
+        ProcessRunner.run(command, ProcessConfig(envVars = env, timeoutSeconds = timeoutSeconds)).getOrElse {
+            return false
+        }.exitCode == 0
 
     private fun buildRedriveAttributes(
         dlqName: String,

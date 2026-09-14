@@ -7,4 +7,5 @@ data class ProcessConfig(
     val workingDir: File? = null,
     val envVars: Map<String, String> = emptyMap(),
     val timeoutSeconds: Long = PROCESS_DEFAULT_TIMEOUT_SECONDS,
+    val stdin: String? = null,
 )

@@ -3,6 +3,7 @@ package dev.lucascosta.awslocalmanager.features.quick
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMPTY_STRING
 import dev.lucascosta.awslocalmanager.data.model.aws.AwsResourceDefinition
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
@@ -17,6 +18,9 @@ data class QuickUiState(
     val elastiCacheEngine: ElastiCacheEngine = ElastiCacheEngine.REDIS,
     val parameterValue: String = EMPTY_STRING,
     val parameterType: SsmParameterType = SsmParameterType.STRING,
+    val mskClusters: List<String> = emptyList(),
+    val selectedMskCluster: String? = null,
+    val topicPartitions: Int = MskTopicResource.DEFAULT_PARTITIONS,
     val isCreating: Boolean = false,
     val history: List<QuickHistoryItem> = emptyList(),
 ) {
@@ -24,5 +28,6 @@ data class QuickUiState(
         get() =
             resourceName.isNotBlank() &&
                 !isCreating &&
-                (selectedType != SsmParameterResource || parameterValue.isNotBlank())
+                (selectedType != SsmParameterResource || parameterValue.isNotBlank()) &&
+                (selectedType != MskTopicResource || selectedMskCluster != null)
 }

@@ -67,6 +67,7 @@ import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorDetail
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorResource
 import dev.lucascosta.awslocalmanager.data.model.inspector.SfnInspectorExecution
 import dev.lucascosta.awslocalmanager.data.model.inspector.SqsInspectorMessage
+import dev.lucascosta.awslocalmanager.features.inspector.handler.MskInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
 import dev.lucascosta.awslocalmanager.i18n.InspectorStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
@@ -507,6 +508,14 @@ private fun DetailPanel(
 
                     is InspectorDetail.SsmDetail ->
                         SsmDetailView(detail = detail, modifier = Modifier.fillMaxSize())
+
+                    is InspectorDetail.MskDetail ->
+                        MskDetailView(
+                            detail = detail,
+                            isLoadingSubDetail = state.isLoadingSubDetail,
+                            onSelectTopic = viewModel::selectDetailItem,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                 }
             }
 
@@ -1129,6 +1138,7 @@ private fun localizedSummary(
         "sfn" -> strings.inspectorSummarySfn
         "s3" -> strings.inspectorSummaryS3
         "redis", "memcached" -> strings.inspectorSummaryElastiCache
+        MskInspectorHandler.SUMMARY_TYPE -> strings.inspectorSummaryMsk
 
         "ssm" ->
             pluralizedCount(

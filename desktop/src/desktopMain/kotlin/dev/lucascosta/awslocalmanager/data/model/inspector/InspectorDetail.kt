@@ -29,6 +29,28 @@ data class SsmInspectorParameter(
     val version: Long,
 )
 
+data class MskInspectorTopic(
+    val name: String,
+    val partitions: Int,
+    val replicas: Int,
+)
+
+data class MskInspectorRecord(
+    val partition: Int,
+    val offset: Long,
+    val timestamp: Long,
+    val key: String,
+    val value: String,
+    val headers: Map<String, String>,
+)
+
+data class MskInspectorGroup(
+    val name: String,
+    val state: String,
+    val members: Int,
+    val totalLag: Long,
+)
+
 sealed class InspectorDetail {
     data class SqsDetail(
         val messages: List<SqsInspectorMessage>,
@@ -71,5 +93,20 @@ sealed class InspectorDetail {
         val cacheEntries: List<CacheEntry> = emptyList(),
         val hasMore: Boolean = false,
         val cursor: String = "0",
+    ) : InspectorDetail()
+
+    data class MskDetail(
+        val clusterName: String,
+        val clusterType: String,
+        val state: String,
+        val kafkaVersion: String?,
+        val brokerNodes: Int?,
+        val brokerContainer: String?,
+        val hostAddress: String?,
+        val dockerNetwork: String,
+        val topics: List<MskInspectorTopic> = emptyList(),
+        val consumerGroups: List<MskInspectorGroup> = emptyList(),
+        val selectedTopic: String? = null,
+        val records: List<MskInspectorRecord> = emptyList(),
     ) : InspectorDetail()
 }

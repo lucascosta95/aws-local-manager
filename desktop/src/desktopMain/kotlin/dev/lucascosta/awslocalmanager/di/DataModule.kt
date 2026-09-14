@@ -8,6 +8,7 @@ import dev.lucascosta.awslocalmanager.data.remote.AwsSqsClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsSsmClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsStepFunctionsClient
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorClient
+import dev.lucascosta.awslocalmanager.data.remote.KafkaBrokerClient
 import dev.lucascosta.awslocalmanager.data.repository.MessageRepository
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import dev.lucascosta.awslocalmanager.data.repository.RunningResourceRepository
@@ -23,6 +24,7 @@ val dataModule =
     module {
         single { PreferencesRepository() }
         single { EmulatorClient() }
+        single { KafkaBrokerClient() }
 
         factory { (endpoint: String) -> AwsSnsClient(endpoint) }
         factory { (endpoint: String) -> AwsSqsClient(endpoint) }
@@ -30,15 +32,18 @@ val dataModule =
         factory { (endpoint: String) -> AwsDynamoDbClient(endpoint) }
 
         factory<(String) -> MessageRepository> {
-            { endpoint ->
+            val kafkaBrokerClient: KafkaBrokerClient = get()
+            val createRepository: (String) -> MessageRepository = { endpoint ->
                 MessageRepository(
                     snsClient = AwsSnsClient(endpoint),
                     sqsClient = AwsSqsClient(endpoint),
                     s3Client = AwsS3Client(endpoint),
                     dynamoDbClient = AwsDynamoDbClient(endpoint),
                     stepFunctionsClient = AwsStepFunctionsClient(endpoint),
+                    kafkaBrokerClient = kafkaBrokerClient,
                 )
             }
+            createRepository
         }
 
         single { UpdateRepository() }

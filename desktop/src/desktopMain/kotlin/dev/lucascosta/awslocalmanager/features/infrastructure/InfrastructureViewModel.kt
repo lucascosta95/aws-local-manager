@@ -12,6 +12,7 @@ import dev.lucascosta.awslocalmanager.data.model.project.ApplyContext
 import dev.lucascosta.awslocalmanager.data.model.project.InfraLogStrings
 import dev.lucascosta.awslocalmanager.data.model.project.InfraProject
 import dev.lucascosta.awslocalmanager.data.model.project.TerraformResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsSubscriptionResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
@@ -20,6 +21,8 @@ import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import dev.lucascosta.awslocalmanager.domain.AppLogger
 import dev.lucascosta.awslocalmanager.domain.AwsResourceChecker
+import dev.lucascosta.awslocalmanager.domain.KafkaHostProxySupervisor
+import dev.lucascosta.awslocalmanager.domain.MskTopicProvisioner
 import dev.lucascosta.awslocalmanager.domain.ServiceStatusChecker
 import dev.lucascosta.awslocalmanager.domain.TerraformReader
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +45,8 @@ class InfrastructureViewModel(
     private val terraformReader: TerraformReader,
     private val serviceStatusChecker: ServiceStatusChecker,
     private val resourceChecker: AwsResourceChecker,
+    private val mskTopicProvisioner: MskTopicProvisioner,
+    private val kafkaHostProxySupervisor: KafkaHostProxySupervisor,
 ) : BaseViewModel() {
     private companion object {
         const val LOG_SOURCE = "Infrastructure"
@@ -263,13 +268,14 @@ class InfrastructureViewModel(
             )
         }
 
-        val ctx = ApplyContext(ProcessRunner.awsEnvVars(endpoint), logStrings)
+        val ctx = ApplyContext(endpoint, ProcessRunner.awsEnvVars(endpoint), logStrings)
         for (resource in resources) {
             applyResourceCommand(resource, ctx)
         }
         for (sub in relevantSubscriptions) {
             applySubscription(sub, registry, ctx)
         }
+        kafkaHostProxySupervisor.requestReconcile()
 
         _state.update { it.copy(isRunning = false) }
     }
@@ -280,6 +286,10 @@ class InfrastructureViewModel(
     ) {
         val typeName = resource.resourceType?.id ?: resource.rawAwsType
         appendLog(ProcessLine(ctx.logStrings.creatingFmt.replace("{name}", resource.awsName).replace("{type}", typeName), false))
+        if (resource.resourceType == MskTopicResource) {
+            applyMskTopic(resource, ctx)
+            return
+        }
         val command = resource.resourceType?.createCommand(resource.awsName, resource.extraProperties)
         if (command == null) {
             appendLog(ProcessLine(ctx.logStrings.unsupportedFmt.replace("{type}", typeName), true))
@@ -289,7 +299,8 @@ class InfrastructureViewModel(
 
         setResourceStatus(resource.tfLabel, ResourceOpStatus.PENDING)
 
-        ProcessRunner.run(command, ProcessConfig(envVars = ctx.env)).fold(
+        val config = ProcessConfig(envVars = ctx.env, timeoutSeconds = resource.resourceType.createTimeoutSeconds)
+        ProcessRunner.run(command, config).fold(
             onSuccess = { output ->
                 output.stdout.lines().filter { it.isNotBlank() }.forEach { line -> appendLog(ProcessLine(line, false)) }
                 val succeeded = output.exitCode == 0 || output.exitCode == EXIT_CODE_ALREADY_EXISTS
@@ -306,6 +317,29 @@ class InfrastructureViewModel(
                 appendLog(ProcessLine(ctx.logStrings.createErrorFmt.replace("{name}", resource.awsName), true))
             },
         )
+    }
+
+    private suspend fun applyMskTopic(
+        resource: TerraformResource,
+        ctx: ApplyContext,
+    ) {
+        setResourceStatus(resource.tfLabel, ResourceOpStatus.PENDING)
+        val cluster = resource.extraProperties[MskTopicResource.CLUSTER_PROPERTY] ?: MskTopicResource.clusterOf(resource.awsName)
+        val partitions =
+            resource.extraProperties[MskTopicResource.PARTITIONS_PROPERTY]?.toIntOrNull() ?: MskTopicResource.DEFAULT_PARTITIONS
+        appendLog(ProcessLine(ctx.logStrings.waitingClusterFmt.replace("{cluster}", cluster), false))
+
+        mskTopicProvisioner
+            .createTopic(ctx.endpoint, cluster, MskTopicResource.topicOf(resource.awsName), partitions)
+            .onSuccess {
+                setResourceStatus(resource.tfLabel, ResourceOpStatus.SUCCESS)
+                appendLog(ProcessLine(ctx.logStrings.createdFmt.replace("{name}", resource.awsName), false))
+            }
+            .onFailure { failure ->
+                setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)
+                failure.message?.let { appendLog(ProcessLine(it, true)) }
+                appendLog(ProcessLine(ctx.logStrings.createErrorFmt.replace("{name}", resource.awsName), true))
+            }
     }
 
     private suspend fun applySubscription(

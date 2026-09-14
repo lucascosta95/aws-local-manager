@@ -194,3 +194,43 @@ object SsmCommands {
 
     fun deleteParameter(name: String): List<String> = listOf("aws", "ssm", "delete-parameter", "--name", name)
 }
+
+object MskCommands {
+    private const val PLACEHOLDER_SUBNET = "subnet-local"
+
+    fun createCluster(
+        name: String,
+        kafkaVersion: String,
+        brokerNodes: String,
+        instanceType: String,
+    ): List<String> =
+        listOf(
+            "aws",
+            "kafka",
+            "create-cluster",
+            "--cluster-name",
+            name,
+            "--kafka-version",
+            kafkaVersion,
+            "--number-of-broker-nodes",
+            brokerNodes,
+            "--broker-node-group-info",
+            """{"InstanceType":"$instanceType","ClientSubnets":["$PLACEHOLDER_SUBNET"]}""",
+            "--output",
+            "text",
+        )
+
+    fun deleteCluster(clusterArn: String): List<String> = listOf("aws", "kafka", "delete-cluster", "--cluster-arn", clusterArn)
+}
+
+object KafkaBrokerCommands {
+    fun deleteTopic(
+        container: String,
+        topic: String,
+    ): List<String> = rpk(container, listOf("topic", "delete", topic))
+
+    fun rpk(
+        container: String,
+        arguments: List<String>,
+    ): List<String> = listOf("docker", "exec", "-i", container, "rpk") + arguments
+}
