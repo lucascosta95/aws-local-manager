@@ -7,7 +7,7 @@ import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
 
 object DynamoDbResource : AwsResourceDefinition {
     override val id = "DYNAMODB"
-    override val displayName = "DYNAMODB"
+    override val displayName = "DynamoDB"
     override val terraformPrefix = "aws_dynamodb_table"
     override val healthKey = "dynamodb"
     override val creationPriority = 2

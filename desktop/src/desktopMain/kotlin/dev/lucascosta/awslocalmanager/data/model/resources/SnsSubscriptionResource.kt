@@ -6,7 +6,7 @@ import dev.lucascosta.awslocalmanager.data.model.aws.SuccessSnackbarKey
 
 object SnsSubscriptionResource : AwsResourceDefinition {
     override val id = "SNS_SUBSCRIPTION"
-    override val displayName = "SNS_SUBSCRIPTION"
+    override val displayName = "SNS Subscription"
     override val terraformPrefix = "aws_sns_topic_subscription"
     override val healthKey = "sns"
     override val creationPriority = Int.MAX_VALUE
