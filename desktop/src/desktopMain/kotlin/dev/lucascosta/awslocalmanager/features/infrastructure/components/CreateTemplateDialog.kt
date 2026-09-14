@@ -39,7 +39,7 @@ internal fun CreateTemplateDialog(
                         FilterChip(
                             selected = templateType == type,
                             onClick = { onTypeChange(type) },
-                            label = { Text(type.id, style = MaterialTheme.typography.labelSmall) },
+                            label = { Text(type.displayName, style = MaterialTheme.typography.labelSmall) },
                         )
                     }
                 }

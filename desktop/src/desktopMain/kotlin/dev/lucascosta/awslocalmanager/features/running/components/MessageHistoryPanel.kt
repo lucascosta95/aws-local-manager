@@ -137,7 +137,7 @@ private fun HistoryItem(
                 modifier = Modifier.size(16.dp),
             )
             Text(time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(item.type.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Text(item.type.displayName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             Text(
                 item.resourceName.substringAfterLast(":").substringAfterLast("/"),
                 style = MaterialTheme.typography.bodySmall,

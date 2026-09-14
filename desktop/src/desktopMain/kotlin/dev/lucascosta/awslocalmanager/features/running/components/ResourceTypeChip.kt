@@ -25,7 +25,7 @@ internal fun ResourceTypeChip(
                 .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
         Text(
-            type.id,
+            type.displayName,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
         )

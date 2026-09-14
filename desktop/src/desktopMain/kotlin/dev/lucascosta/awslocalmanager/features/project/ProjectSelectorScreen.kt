@@ -145,7 +145,7 @@ private fun ProjectCard(
     modifier: Modifier = Modifier,
 ) {
     val strings = LocalStrings.current
-    val typesByCount = project.resources.groupBy { it.resourceType?.id ?: it.rawAwsType }
+    val typesByCount = project.resources.groupBy { it.resourceType?.displayName ?: it.rawAwsType }
 
     val typeBreakdown =
         typesByCount.entries
