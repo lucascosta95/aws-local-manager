@@ -8,15 +8,18 @@ import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorDetail
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorResource
 import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorGroup
 import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorRecord
+import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorSchema
 import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorTopic
 import dev.lucascosta.awslocalmanager.data.remote.AwsMskClient
+import dev.lucascosta.awslocalmanager.data.remote.HostProxy
+import dev.lucascosta.awslocalmanager.data.remote.HostProxyClient
+import dev.lucascosta.awslocalmanager.data.remote.HostProxyKind
 import dev.lucascosta.awslocalmanager.data.remote.KafkaBrokerClient
-import dev.lucascosta.awslocalmanager.data.remote.KafkaHostProxyClient
 import dev.lucascosta.awslocalmanager.data.remote.MskClusterInfo
 
 class MskInspectorHandler(
     private val brokerClient: KafkaBrokerClient = KafkaBrokerClient(),
-    private val proxyClient: KafkaHostProxyClient = KafkaHostProxyClient(),
+    private val proxyClient: HostProxyClient = HostProxyClient(),
 ) : InspectorServiceHandler {
     companion object {
         const val SUMMARY_TYPE = "msk"
@@ -46,6 +49,7 @@ class MskInspectorHandler(
                 ?: AwsMskClient(endpoint).findCluster(resource.id).getOrThrow()
                 ?: error("Cluster ${resource.id} no longer exists")
         val container = if (info.isActive) brokerClient.findBrokerContainer(info.name) else null
+        val proxies = if (container == null) emptyList() else proxyClient.list()
         val detail =
             InspectorDetail.MskDetail(
                 clusterName = info.name,
@@ -54,7 +58,8 @@ class MskInspectorHandler(
                 kafkaVersion = info.kafkaVersion,
                 brokerNodes = info.brokerNodes,
                 brokerContainer = container,
-                hostAddress = container?.let { findHostAddress(info.name, it) },
+                hostAddress = container?.let { proxies.hostAddress(HostProxyKind.KAFKA, info.name, it) },
+                schemaRegistryHostAddress = container?.let { proxies.hostAddress(HostProxyKind.SCHEMA_REGISTRY, info.name, it) },
                 dockerNetwork = EMULATOR_DOCKER_NETWORK,
             )
         if (container == null) return detail
@@ -65,13 +70,18 @@ class MskInspectorHandler(
                 brokerClient.listConsumerGroups(container).getOrThrow().map {
                     MskInspectorGroup(it.name, it.state, it.members, it.totalLag)
                 },
+            schemas =
+                brokerClient.listSchemaSubjects(container).getOrThrow().map {
+                    MskInspectorSchema(it.subject, it.version, it.id, it.type, it.schema)
+                },
         )
     }
 
-    private suspend fun findHostAddress(
+    private fun List<HostProxy>.hostAddress(
+        kind: HostProxyKind,
         cluster: String,
         broker: String,
-    ): String? = proxyClient.list().firstOrNull { it.cluster == cluster && it.broker == broker && it.isRunning }?.hostAddress
+    ): String? = firstOrNull { it.kind == kind && it.cluster == cluster && it.broker == broker && it.isRunning }?.hostAddress
 
     override suspend fun loadSubDetail(
         endpoint: String,

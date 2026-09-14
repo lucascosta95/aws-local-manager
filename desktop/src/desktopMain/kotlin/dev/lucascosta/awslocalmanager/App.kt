@@ -46,7 +46,7 @@ import dev.lucascosta.awslocalmanager.data.remote.EmulatorClient
 import dev.lucascosta.awslocalmanager.data.repository.AppPreferences
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import dev.lucascosta.awslocalmanager.di.appModules
-import dev.lucascosta.awslocalmanager.domain.KafkaHostProxySupervisor
+import dev.lucascosta.awslocalmanager.domain.HostProxySupervisor
 import dev.lucascosta.awslocalmanager.features.dashboard.DashboardViewModel
 import dev.lucascosta.awslocalmanager.features.infrastructure.InfrastructureViewModel
 import dev.lucascosta.awslocalmanager.features.inspector.InspectorViewModel
@@ -157,7 +157,7 @@ fun AppRoot() {
     val preferencesRepository: PreferencesRepository = koinInject()
     val settingsViewModel: SettingsViewModel = koinInject()
     val updateViewModel: UpdateViewModel = koinInject()
-    val kafkaHostProxySupervisor: KafkaHostProxySupervisor = koinInject()
+    val hostProxySupervisor: HostProxySupervisor = koinInject()
 
     val allViewModels =
         listOf(
@@ -175,9 +175,9 @@ fun AppRoot() {
         )
 
     DisposableEffect(Unit) {
-        kafkaHostProxySupervisor.start()
+        hostProxySupervisor.start()
         onDispose {
-            kafkaHostProxySupervisor.stop()
+            hostProxySupervisor.stop()
             emulatorClient.close()
             allViewModels.forEach { it.onCleared() }
         }

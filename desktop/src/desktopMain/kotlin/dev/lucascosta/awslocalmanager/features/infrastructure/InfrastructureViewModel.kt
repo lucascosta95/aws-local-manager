@@ -21,7 +21,7 @@ import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import dev.lucascosta.awslocalmanager.domain.AppLogger
 import dev.lucascosta.awslocalmanager.domain.AwsResourceChecker
-import dev.lucascosta.awslocalmanager.domain.KafkaHostProxySupervisor
+import dev.lucascosta.awslocalmanager.domain.HostProxySupervisor
 import dev.lucascosta.awslocalmanager.domain.MskTopicProvisioner
 import dev.lucascosta.awslocalmanager.domain.ServiceStatusChecker
 import dev.lucascosta.awslocalmanager.domain.TerraformReader
@@ -46,7 +46,7 @@ class InfrastructureViewModel(
     private val serviceStatusChecker: ServiceStatusChecker,
     private val resourceChecker: AwsResourceChecker,
     private val mskTopicProvisioner: MskTopicProvisioner,
-    private val kafkaHostProxySupervisor: KafkaHostProxySupervisor,
+    private val hostProxySupervisor: HostProxySupervisor,
 ) : BaseViewModel() {
     private companion object {
         const val LOG_SOURCE = "Infrastructure"
@@ -275,7 +275,7 @@ class InfrastructureViewModel(
         for (sub in relevantSubscriptions) {
             applySubscription(sub, registry, ctx)
         }
-        kafkaHostProxySupervisor.requestReconcile()
+        hostProxySupervisor.requestReconcile()
 
         _state.update { it.copy(isRunning = false) }
     }

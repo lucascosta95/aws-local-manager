@@ -28,7 +28,7 @@ import dev.lucascosta.awslocalmanager.data.remote.EmulatorDefaults
 import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.remote.SsmCommands
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
-import dev.lucascosta.awslocalmanager.domain.KafkaHostProxySupervisor
+import dev.lucascosta.awslocalmanager.domain.HostProxySupervisor
 import dev.lucascosta.awslocalmanager.domain.MskTopicProvisioner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -48,7 +48,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class QuickViewModel(
     private val preferencesRepository: PreferencesRepository,
     private val mskTopicProvisioner: MskTopicProvisioner,
-    private val kafkaHostProxySupervisor: KafkaHostProxySupervisor,
+    private val hostProxySupervisor: HostProxySupervisor,
     private val mskClientFactory: (String) -> AwsMskClient = ::AwsMskClient,
 ) : BaseViewModel() {
     private val _state = MutableStateFlow(QuickUiState())
@@ -137,7 +137,7 @@ class QuickViewModel(
                     )
                 }
             _state.update { it.copy(isCreating = false, history = newItems + it.history) }
-            kafkaHostProxySupervisor.requestReconcile()
+            hostProxySupervisor.requestReconcile()
         }
     }
 

@@ -43,6 +43,10 @@ object AppConstants {
     const val KAFKA_PROXY_IMAGE = "grepplabs/kafka-proxy:0.4.3"
     const val KAFKA_PROXY_FIRST_HOST_PORT = 19092
     const val KAFKA_PROXY_LAST_HOST_PORT = 19191
+    const val SCHEMA_REGISTRY_PORT = 8081
+    const val SCHEMA_REGISTRY_PROXY_IMAGE = "alpine/socat:1.8.1.3"
+    const val SCHEMA_REGISTRY_PROXY_FIRST_HOST_PORT = 18081
+    const val SCHEMA_REGISTRY_PROXY_LAST_HOST_PORT = 18180
     const val LOOPBACK_HOST = "127.0.0.1"
 
     // Session log

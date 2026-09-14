@@ -22,6 +22,14 @@ data class KafkaRecord(
     val headers: Map<String, String>,
 )
 
+data class KafkaSchemaSubject(
+    val subject: String,
+    val version: Int,
+    val id: Int,
+    val type: String,
+    val schema: String,
+)
+
 data class KafkaConsumerGroup(
     val name: String,
     val state: String,
@@ -34,6 +42,9 @@ class KafkaBrokerClient {
         const val SERVICE_LABEL = "io.floci.service=msk"
         const val RESOURCE_LABEL = "io.floci.resource-id"
         const val TOPIC_ALREADY_EXISTS = "TOPIC_ALREADY_EXISTS"
+
+        // Kafka tooling reserves a leading underscore for internal topics, such as _schemas, which backs the schema registry.
+        const val INTERNAL_TOPIC_PREFIX = "_"
         val producedPattern = Regex("""Produced to partition (\d+) at offset (\d+)""")
     }
 
@@ -57,7 +68,9 @@ class KafkaBrokerClient {
 
     suspend fun listTopics(container: String): Result<List<KafkaTopicInfo>> =
         runRpk(container, listOf("topic", "list", "--format", "json")).map { stdout ->
-            json.decodeFromString<List<TopicDto>>(stdout.ifBlank { "[]" }).map { KafkaTopicInfo(it.name, it.partitions, it.replicas) }
+            json.decodeFromString<List<TopicDto>>(stdout.ifBlank { "[]" })
+                .filterNot { it.name.startsWith(INTERNAL_TOPIC_PREFIX) }
+                .map { KafkaTopicInfo(it.name, it.partitions, it.replicas) }
         }
 
     suspend fun createTopic(
@@ -139,6 +152,19 @@ class KafkaBrokerClient {
             }
         }
 
+    suspend fun listSchemaSubjects(container: String): Result<List<KafkaSchemaSubject>> =
+        runRpk(container, listOf("registry", "schema", "list", "--format", "json")).mapCatching { stdout ->
+            json.decodeFromString<List<SchemaVersionDto>>(stdout.ifBlank { "[]" })
+                .groupBy { it.subject }
+                .map { (_, versions) -> versions.maxBy { it.version } }
+                .sortedBy { it.subject }
+                .map { latest ->
+                    val arguments = listOf("registry", "schema", "get", latest.subject, "--schema-version", "latest", "--print-schema")
+                    val schema = runRpk(container, arguments).getOrThrow()
+                    KafkaSchemaSubject(latest.subject, latest.version, latest.id, latest.type, schema)
+                }
+        }
+
     private suspend fun runRpk(
         container: String,
         arguments: List<String>,
@@ -201,6 +227,14 @@ class KafkaBrokerClient {
     private data class HeaderDto(
         val key: String,
         val value: String = "",
+    )
+
+    @Serializable
+    private data class SchemaVersionDto(
+        val subject: String,
+        val version: Int,
+        val id: Int = 0,
+        val type: String = "",
     )
 
     @Serializable

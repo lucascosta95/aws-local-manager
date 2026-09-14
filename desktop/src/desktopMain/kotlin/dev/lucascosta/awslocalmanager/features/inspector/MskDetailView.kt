@@ -28,6 +28,7 @@ import dev.lucascosta.awslocalmanager.components.CopyButton
 import dev.lucascosta.awslocalmanager.components.ResizableTable
 import dev.lucascosta.awslocalmanager.components.TableColumn
 import dev.lucascosta.awslocalmanager.constants.AppConstants.MSK_BROKER_PORT
+import dev.lucascosta.awslocalmanager.constants.AppConstants.SCHEMA_REGISTRY_PORT
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorDetail
 import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorRecord
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
@@ -60,6 +61,7 @@ internal fun MskDetailView(
             } else {
                 MskTopicsSection(detail, onSelectTopic)
                 MskConsumerGroupsSection(detail)
+                MskSchemasSection(detail)
                 HorizontalDivider()
                 MskRecordsSection(detail, isLoadingSubDetail)
             }
@@ -75,7 +77,12 @@ internal fun MskDetailView(
 private fun MskClusterSummary(detail: InspectorDetail.MskDetail) {
     val strings = LocalInspectorStrings.current
     val copyableLabels =
-        setOfNotNull(strings.inspectorMskBrokerAddress, strings.inspectorMskHostAddress.takeIf { detail.hostAddress != null })
+        setOfNotNull(
+            strings.inspectorMskBrokerAddress,
+            strings.inspectorMskSchemaRegistryNetworkAddress,
+            strings.inspectorMskHostAddress.takeIf { detail.hostAddress != null },
+            strings.inspectorMskSchemaRegistryHostAddress.takeIf { detail.schemaRegistryHostAddress != null },
+        )
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         listOfNotNull(
             strings.inspectorMskType to detail.clusterType.ifBlank { null },
@@ -84,6 +91,9 @@ private fun MskClusterSummary(detail: InspectorDetail.MskDetail) {
             strings.inspectorMskBrokers to detail.brokerNodes?.toString(),
             strings.inspectorMskHostAddress to detail.brokerContainer?.let { detail.hostAddress ?: strings.inspectorMskHostAddressPending },
             strings.inspectorMskBrokerAddress to detail.brokerContainer?.let { "$it:$MSK_BROKER_PORT" },
+            strings.inspectorMskSchemaRegistryHostAddress to
+                detail.brokerContainer?.let { detail.schemaRegistryHostAddress ?: strings.inspectorMskHostAddressPending },
+            strings.inspectorMskSchemaRegistryNetworkAddress to detail.brokerContainer?.let { "http://$it:$SCHEMA_REGISTRY_PORT" },
             strings.inspectorMskDockerNetwork to detail.dockerNetwork,
         ).forEach { (label, value) ->
             if (value != null) {
@@ -104,7 +114,7 @@ private fun SummaryRow(
             label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.widthIn(min = 140.dp),
+            modifier = Modifier.widthIn(min = 210.dp),
         )
         Text(value, style = MaterialTheme.typography.bodySmall)
         if (copyable) {
@@ -150,6 +160,25 @@ private fun MskConsumerGroupsSection(detail: InspectorDetail.MskDetail) {
         rows = detail.consumerGroups.map { listOf(it.name, it.state, it.members.toString(), it.totalLag.toString()) },
         emptyMessage = strings.inspectorMskNoGroups,
         modifier = Modifier.fillMaxWidth().height(tableHeight(detail.consumerGroups.size)),
+    )
+}
+
+@Composable
+private fun MskSchemasSection(detail: InspectorDetail.MskDetail) {
+    val strings = LocalInspectorStrings.current
+    SectionTitle(strings.inspectorMskSchemas)
+    ResizableTable(
+        columns =
+            listOf(
+                TableColumn(strings.inspectorMskSubjectColumn, 0.50f),
+                TableColumn(strings.inspectorMskVersionColumn, 0.15f),
+                TableColumn(strings.inspectorMskSchemaIdColumn, 0.15f),
+                TableColumn(strings.inspectorMskSchemaTypeColumn, 0.20f),
+            ),
+        rows = detail.schemas.map { listOf(it.subject, it.version.toString(), it.id.toString(), it.type) },
+        emptyMessage = strings.inspectorMskNoSchemas,
+        onRowCopy = { index -> detail.schemas[index].schema },
+        modifier = Modifier.fillMaxWidth().height(tableHeight(detail.schemas.size)),
     )
 }
 

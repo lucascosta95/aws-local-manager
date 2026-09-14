@@ -44,6 +44,14 @@ data class MskInspectorRecord(
     val headers: Map<String, String>,
 )
 
+data class MskInspectorSchema(
+    val subject: String,
+    val version: Int,
+    val id: Int,
+    val type: String,
+    val schema: String,
+)
+
 data class MskInspectorGroup(
     val name: String,
     val state: String,
@@ -103,9 +111,11 @@ sealed class InspectorDetail {
         val brokerNodes: Int?,
         val brokerContainer: String?,
         val hostAddress: String?,
+        val schemaRegistryHostAddress: String?,
         val dockerNetwork: String,
         val topics: List<MskInspectorTopic> = emptyList(),
         val consumerGroups: List<MskInspectorGroup> = emptyList(),
+        val schemas: List<MskInspectorSchema> = emptyList(),
         val selectedTopic: String? = null,
         val records: List<MskInspectorRecord> = emptyList(),
     ) : InspectorDetail()
