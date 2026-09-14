@@ -3,6 +3,8 @@ package dev.lucascosta.awslocalmanager.features.quick
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMPTY_STRING
 import dev.lucascosta.awslocalmanager.data.model.aws.AwsResourceDefinition
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaDataFormat
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaResource
 import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
@@ -21,6 +23,11 @@ data class QuickUiState(
     val mskClusters: List<String> = emptyList(),
     val selectedMskCluster: String? = null,
     val topicPartitions: Int = MskTopicResource.DEFAULT_PARTITIONS,
+    val glueRegistries: List<String> = emptyList(),
+    val selectedGlueRegistry: String? = null,
+    val glueDataFormat: GlueSchemaDataFormat = GlueSchemaDataFormat.AVRO,
+    val glueCompatibility: String = GlueSchemaResource.DEFAULT_COMPATIBILITY,
+    val glueSchemaDefinition: String = EMPTY_STRING,
     val isCreating: Boolean = false,
     val history: List<QuickHistoryItem> = emptyList(),
 ) {
@@ -29,5 +36,6 @@ data class QuickUiState(
             resourceName.isNotBlank() &&
                 !isCreating &&
                 (selectedType != SsmParameterResource || parameterValue.isNotBlank()) &&
-                (selectedType != MskTopicResource || selectedMskCluster != null)
+                (selectedType != MskTopicResource || selectedMskCluster != null) &&
+                (selectedType != GlueSchemaResource || (selectedGlueRegistry != null && glueSchemaDefinition.isNotBlank()))
 }

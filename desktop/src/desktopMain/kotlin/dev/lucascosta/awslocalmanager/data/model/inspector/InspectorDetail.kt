@@ -59,6 +59,19 @@ data class MskInspectorGroup(
     val totalLag: Long,
 )
 
+data class GlueInspectorSchema(
+    val name: String,
+    val dataFormat: String,
+    val compatibility: String,
+    val latestVersion: Long,
+)
+
+data class GlueInspectorSchemaVersion(
+    val versionNumber: Long,
+    val status: String,
+    val createdTime: String,
+)
+
 sealed class InspectorDetail {
     data class SqsDetail(
         val messages: List<SqsInspectorMessage>,
@@ -101,6 +114,15 @@ sealed class InspectorDetail {
         val cacheEntries: List<CacheEntry> = emptyList(),
         val hasMore: Boolean = false,
         val cursor: String = "0",
+    ) : InspectorDetail()
+
+    data class GlueSchemaRegistryDetail(
+        val registry: String,
+        val schemas: List<GlueInspectorSchema>,
+        val selectedSchema: String? = null,
+        val versions: List<GlueInspectorSchemaVersion> = emptyList(),
+        val selectedVersion: Long? = null,
+        val definition: String? = null,
     ) : InspectorDetail()
 
     data class MskDetail(

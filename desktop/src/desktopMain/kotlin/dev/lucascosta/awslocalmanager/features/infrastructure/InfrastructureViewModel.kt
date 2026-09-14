@@ -12,6 +12,7 @@ import dev.lucascosta.awslocalmanager.data.model.project.ApplyContext
 import dev.lucascosta.awslocalmanager.data.model.project.InfraLogStrings
 import dev.lucascosta.awslocalmanager.data.model.project.InfraProject
 import dev.lucascosta.awslocalmanager.data.model.project.TerraformResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaResource
 import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsSubscriptionResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
@@ -21,6 +22,7 @@ import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import dev.lucascosta.awslocalmanager.domain.AppLogger
 import dev.lucascosta.awslocalmanager.domain.AwsResourceChecker
+import dev.lucascosta.awslocalmanager.domain.GlueSchemaProvisioner
 import dev.lucascosta.awslocalmanager.domain.HostProxySupervisor
 import dev.lucascosta.awslocalmanager.domain.MskTopicProvisioner
 import dev.lucascosta.awslocalmanager.domain.ServiceStatusChecker
@@ -46,6 +48,7 @@ class InfrastructureViewModel(
     private val serviceStatusChecker: ServiceStatusChecker,
     private val resourceChecker: AwsResourceChecker,
     private val mskTopicProvisioner: MskTopicProvisioner,
+    private val glueSchemaProvisioner: GlueSchemaProvisioner,
     private val hostProxySupervisor: HostProxySupervisor,
 ) : BaseViewModel() {
     private companion object {
@@ -284,11 +287,12 @@ class InfrastructureViewModel(
         resource: TerraformResource,
         ctx: ApplyContext,
     ) {
-        val typeName = resource.resourceType?.id ?: resource.rawAwsType
+        val typeName = resource.resourceType?.displayName ?: resource.rawAwsType
         appendLog(ProcessLine(ctx.logStrings.creatingFmt.replace("{name}", resource.awsName).replace("{type}", typeName), false))
-        if (resource.resourceType == MskTopicResource) {
-            applyMskTopic(resource, ctx)
-            return
+        when (resource.resourceType) {
+            MskTopicResource -> return applyWithProvisioner(resource, ctx) { provisionMskTopic(resource, ctx) }
+            GlueSchemaResource -> return applyWithProvisioner(resource, ctx) { provisionGlueSchema(resource, ctx) }
+            else -> Unit
         }
         val command = resource.resourceType?.createCommand(resource.awsName, resource.extraProperties)
         if (command == null) {
@@ -319,18 +323,30 @@ class InfrastructureViewModel(
         )
     }
 
-    private suspend fun applyMskTopic(
+    private suspend fun provisionMskTopic(
         resource: TerraformResource,
         ctx: ApplyContext,
-    ) {
-        setResourceStatus(resource.tfLabel, ResourceOpStatus.PENDING)
+    ): Result<Unit> {
         val cluster = resource.extraProperties[MskTopicResource.CLUSTER_PROPERTY] ?: MskTopicResource.clusterOf(resource.awsName)
         val partitions =
             resource.extraProperties[MskTopicResource.PARTITIONS_PROPERTY]?.toIntOrNull() ?: MskTopicResource.DEFAULT_PARTITIONS
         appendLog(ProcessLine(ctx.logStrings.waitingClusterFmt.replace("{cluster}", cluster), false))
+        return mskTopicProvisioner.createTopic(ctx.endpoint, cluster, MskTopicResource.topicOf(resource.awsName), partitions)
+    }
 
-        mskTopicProvisioner
-            .createTopic(ctx.endpoint, cluster, MskTopicResource.topicOf(resource.awsName), partitions)
+    private suspend fun provisionGlueSchema(
+        resource: TerraformResource,
+        ctx: ApplyContext,
+    ): Result<Unit> =
+        glueSchemaProvisioner.apply(ctx.endpoint, GlueSchemaResource.definitionFrom(resource.awsName, resource.extraProperties))
+
+    private suspend fun applyWithProvisioner(
+        resource: TerraformResource,
+        ctx: ApplyContext,
+        provision: suspend () -> Result<Unit>,
+    ) {
+        setResourceStatus(resource.tfLabel, ResourceOpStatus.PENDING)
+        provision()
             .onSuccess {
                 setResourceStatus(resource.tfLabel, ResourceOpStatus.SUCCESS)
                 appendLog(ProcessLine(ctx.logStrings.createdFmt.replace("{name}", resource.awsName), false))

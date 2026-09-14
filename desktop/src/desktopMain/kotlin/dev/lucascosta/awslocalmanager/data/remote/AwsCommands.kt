@@ -234,3 +234,59 @@ object KafkaBrokerCommands {
         arguments: List<String>,
     ): List<String> = listOf("docker", "exec", "-i", container, "rpk") + arguments
 }
+
+object GlueSchemaRegistryCommands {
+    fun createRegistry(name: String): List<String> = listOf("aws", "glue", "create-registry", "--registry-name", name, "--output", "text")
+
+    fun deleteRegistry(name: String): List<String> = listOf("aws", "glue", "delete-registry", "--registry-id", "RegistryName=$name")
+
+    fun createSchema(definition: GlueSchemaDefinition): List<String> =
+        listOf(
+            "aws",
+            "glue",
+            "create-schema",
+            "--registry-id",
+            "RegistryName=${definition.registry}",
+            "--schema-name",
+            definition.schema,
+            "--data-format",
+            definition.dataFormat,
+            "--compatibility",
+            definition.compatibility,
+            "--schema-definition",
+            definition.definition,
+            "--output",
+            "json",
+        )
+
+    fun registerSchemaVersion(definition: GlueSchemaDefinition): List<String> =
+        listOf(
+            "aws",
+            "glue",
+            "register-schema-version",
+            "--schema-id",
+            schemaId(definition.registry, definition.schema),
+            "--schema-definition",
+            definition.definition,
+            "--output",
+            "json",
+        )
+
+    fun deleteSchema(
+        registry: String,
+        schema: String,
+    ): List<String> = listOf("aws", "glue", "delete-schema", "--schema-id", schemaId(registry, schema))
+
+    fun schemaId(
+        registry: String,
+        schema: String,
+    ) = "RegistryName=$registry,SchemaName=$schema"
+}
+
+data class GlueSchemaDefinition(
+    val registry: String,
+    val schema: String,
+    val dataFormat: String,
+    val compatibility: String,
+    val definition: String,
+)

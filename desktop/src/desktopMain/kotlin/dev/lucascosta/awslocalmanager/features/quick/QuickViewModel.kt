@@ -14,6 +14,9 @@ import dev.lucascosta.awslocalmanager.data.model.process.ProcessConfig
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueRegistryResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaDataFormat
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaResource
 import dev.lucascosta.awslocalmanager.data.model.resources.MskClusterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
@@ -22,12 +25,16 @@ import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
 import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
+import dev.lucascosta.awslocalmanager.data.remote.AwsGlueSchemaRegistryClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsMskClient
 import dev.lucascosta.awslocalmanager.data.remote.ElastiCacheCommands
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorDefaults
+import dev.lucascosta.awslocalmanager.data.remote.GlueSchemaDefinition
+import dev.lucascosta.awslocalmanager.data.remote.GlueSchemaRegistryCommands
 import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.remote.SsmCommands
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
+import dev.lucascosta.awslocalmanager.domain.GlueSchemaProvisioner
 import dev.lucascosta.awslocalmanager.domain.HostProxySupervisor
 import dev.lucascosta.awslocalmanager.domain.MskTopicProvisioner
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +56,9 @@ class QuickViewModel(
     private val preferencesRepository: PreferencesRepository,
     private val mskTopicProvisioner: MskTopicProvisioner,
     private val hostProxySupervisor: HostProxySupervisor,
+    private val glueSchemaProvisioner: GlueSchemaProvisioner,
     private val mskClientFactory: (String) -> AwsMskClient = ::AwsMskClient,
+    private val glueClientFactory: (String) -> AwsGlueSchemaRegistryClient = ::AwsGlueSchemaRegistryClient,
 ) : BaseViewModel() {
     private val _state = MutableStateFlow(QuickUiState())
     val state: StateFlow<QuickUiState> = _state.asStateFlow()
@@ -58,7 +67,11 @@ class QuickViewModel(
 
     fun setType(type: AwsResourceDefinition) {
         _state.update { it.copy(selectedType = type) }
-        if (type == MskTopicResource) loadMskClusters()
+        when (type) {
+            MskTopicResource -> loadMskClusters()
+            GlueSchemaResource -> loadGlueRegistries()
+            else -> Unit
+        }
     }
 
     fun setName(name: String) {
@@ -99,6 +112,35 @@ class QuickViewModel(
 
     fun setTopicPartitions(partitions: Int) {
         _state.update { it.copy(topicPartitions = partitions) }
+    }
+
+    fun setGlueRegistry(registry: String) {
+        _state.update { it.copy(selectedGlueRegistry = registry) }
+    }
+
+    fun setGlueDataFormat(format: GlueSchemaDataFormat) {
+        _state.update { it.copy(glueDataFormat = format) }
+    }
+
+    fun setGlueCompatibility(compatibility: String) {
+        _state.update { it.copy(glueCompatibility = compatibility) }
+    }
+
+    fun setGlueSchemaDefinition(definition: String) {
+        _state.update { it.copy(glueSchemaDefinition = definition) }
+    }
+
+    private fun loadGlueRegistries() {
+        scope.launch {
+            val endpoint = preferencesRepository.preferences.first().endpoint
+            val registries = glueClientFactory(endpoint).listRegistries().getOrElse { emptyList() }
+            _state.update { state ->
+                state.copy(
+                    glueRegistries = registries,
+                    selectedGlueRegistry = state.selectedGlueRegistry?.takeIf { it in registries } ?: registries.firstOrNull(),
+                )
+            }
+        }
     }
 
     private fun loadMskClusters() {
@@ -155,6 +197,14 @@ class QuickViewModel(
             SsmParameterResource -> listOf(ResourceCreationResult(state.resourceName, createSsmParameter(state, env)))
             MskClusterResource -> listOf(ResourceCreationResult(state.resourceName, createMskCluster(state, env)))
             MskTopicResource -> listOf(createMskTopic(state, endpoint))
+            GlueRegistryResource ->
+                listOf(
+                    ResourceCreationResult(
+                        state.resourceName,
+                        runCommand(GlueSchemaRegistryCommands.createRegistry(state.resourceName), env),
+                    ),
+                )
+            GlueSchemaResource -> listOf(createGlueSchema(state, endpoint))
             else -> listOf(ResourceCreationResult(state.resourceName, false))
         }
 
@@ -226,6 +276,23 @@ class QuickViewModel(
         val cluster = state.selectedMskCluster ?: return ResourceCreationResult(state.resourceName, false)
         val success = mskTopicProvisioner.createTopic(endpoint, cluster, state.resourceName, state.topicPartitions).isSuccess
         return ResourceCreationResult(MskTopicResource.qualifiedName(cluster, state.resourceName), success)
+    }
+
+    private suspend fun createGlueSchema(
+        state: QuickUiState,
+        endpoint: String,
+    ): ResourceCreationResult {
+        val registry = state.selectedGlueRegistry ?: return ResourceCreationResult(state.resourceName, false)
+        val definition =
+            GlueSchemaDefinition(
+                registry = registry,
+                schema = state.resourceName,
+                dataFormat = state.glueDataFormat.name,
+                compatibility = state.glueCompatibility,
+                definition = state.glueSchemaDefinition,
+            )
+        val success = glueSchemaProvisioner.apply(endpoint, definition).isSuccess
+        return ResourceCreationResult(GlueSchemaResource.qualifiedName(registry, state.resourceName), success)
     }
 
     private suspend fun runCommand(

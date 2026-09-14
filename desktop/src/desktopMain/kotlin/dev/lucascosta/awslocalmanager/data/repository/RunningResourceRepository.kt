@@ -31,6 +31,7 @@ class RunningResourceRepository(
     private val ssmClientFactory: (String) -> AwsSsmClient = ::AwsSsmClient,
 ) {
     private val mskRunningResources = MskRunningResources()
+    private val glueRunningResources = GlueRunningResources()
 
     suspend fun fetchAllRunningResources(
         endpoint: String,
@@ -45,8 +46,9 @@ class RunningResourceRepository(
             val elcJob = async { fetchElastiCacheResources(endpoint, activeServices) }
             val ssmJob = async { fetchSsmResources(endpoint, activeServices) }
             val mskJob = async { mskRunningResources.fetch(endpoint, activeServices) }
+            val glueJob = async { glueRunningResources.fetch(endpoint, activeServices) }
 
-            listOf(sqsJob, snsJob, s3Job, dynamoJob, sfnJob, elcJob, ssmJob, mskJob).flatMap { it.await() }
+            listOf(sqsJob, snsJob, s3Job, dynamoJob, sfnJob, elcJob, ssmJob, mskJob, glueJob).flatMap { it.await() }
         }
 
     suspend fun deleteResources(
