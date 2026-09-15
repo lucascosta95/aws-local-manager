@@ -60,7 +60,7 @@ class InfrastructureViewModel(
             selectedResources: Set<String>,
         ): Boolean =
             selectedResources.isNotEmpty() &&
-                project?.resources?.map { it.tfLabel }?.toSet() == selectedResources
+                project?.resources?.map { it.id }?.toSet() == selectedResources
 
         fun computeAvailableTypes(project: InfraProject): List<AwsResourceDefinition> =
             project.resources
@@ -87,11 +87,11 @@ class InfrastructureViewModel(
 
     fun loadProject(project: InfraProject) {
         _state.update {
-            val selected = project.resources.map { resource -> resource.tfLabel }.toSet()
+            val selected = project.resources.map { resource -> resource.id }.toSet()
             it.copy(
                 project = project,
                 selectedResources = selected,
-                resourceStatuses = project.resources.associate { resource -> resource.tfLabel to ResourceOpStatus.IDLE },
+                resourceStatuses = project.resources.associate { resource -> resource.id to ResourceOpStatus.IDLE },
                 logLines = emptyList(),
                 error = null,
                 allSelected = computeAllSelected(project, selected),
@@ -108,11 +108,11 @@ class InfrastructureViewModel(
         scope.launch(Dispatchers.IO) { doRefresh(currentProject) }
     }
 
-    fun toggleResource(tfLabel: String) {
+    fun toggleResource(resourceId: String) {
         _state.update {
             val updated =
                 it.selectedResources.toMutableSet().apply {
-                    if (tfLabel in this) remove(tfLabel) else add(tfLabel)
+                    if (resourceId in this) remove(resourceId) else add(resourceId)
                 }
             it.copy(selectedResources = updated, allSelected = computeAllSelected(it.project, updated))
         }
@@ -120,7 +120,7 @@ class InfrastructureViewModel(
 
     fun selectAll() {
         val project = _state.value.project ?: return
-        val all = project.resources.map { resource -> resource.tfLabel }.toSet()
+        val all = project.resources.map { resource -> resource.id }.toSet()
         _state.update { it.copy(selectedResources = all, allSelected = computeAllSelected(project, all)) }
     }
 
@@ -185,7 +185,7 @@ class InfrastructureViewModel(
             val toApply =
                 project.resources
                     .filter { it.isSupported && it.resourceType != SnsSubscriptionResource }
-                    .filter { _state.value.selectedResources.isEmpty() || it.tfLabel in _state.value.selectedResources }
+                    .filter { _state.value.selectedResources.isEmpty() || it.id in _state.value.selectedResources }
                     .sortedBy { it.resourceType?.creationPriority ?: Int.MAX_VALUE }
             val subscriptions = terraformReader.readSnsSubscriptions(project.directory)
             runDirect(toApply, subscriptions, prefs.endpoint, logStrings)
@@ -199,7 +199,7 @@ class InfrastructureViewModel(
             _state.update {
                 it.copy(
                     isCheckingRunning = true,
-                    runningStatus = project.resources.associate { resource -> resource.tfLabel to ResourceRunningStatus.CHECKING },
+                    runningStatus = project.resources.associate { resource -> resource.id to ResourceRunningStatus.CHECKING },
                 )
             }
 
@@ -217,7 +217,7 @@ class InfrastructureViewModel(
                                     val serviceActive = statuses[resourceType] != AppServiceStatus.ERROR
                                     if (!serviceActive) ResourceRunningStatus.NOT_RUNNING else checkResourceExists(resource, endpoint)
                                 }
-                            resource.tfLabel to status
+                            resource.id to status
                         }
                     }.awaitAll()
                     .toMap()
@@ -228,12 +228,12 @@ class InfrastructureViewModel(
     private fun doRefresh(project: InfraProject) {
         val updatedResources = terraformReader.readResources(project.directory)
         val updatedProject = project.copy(resources = updatedResources)
-        val selected = updatedResources.map { resource -> resource.tfLabel }.toSet()
+        val selected = updatedResources.map { resource -> resource.id }.toSet()
         _state.update {
             it.copy(
                 project = updatedProject,
                 selectedResources = selected,
-                resourceStatuses = updatedProject.resources.associate { resource -> resource.tfLabel to ResourceOpStatus.IDLE },
+                resourceStatuses = updatedProject.resources.associate { resource -> resource.id to ResourceOpStatus.IDLE },
                 allSelected = computeAllSelected(updatedProject, selected),
                 runningStatus = emptyMap(),
                 availableTypes = computeAvailableTypes(updatedProject),
@@ -253,12 +253,8 @@ class InfrastructureViewModel(
         endpoint: String,
         logStrings: InfraLogStrings,
     ) {
-        val registry = resources.associateBy { it.tfLabel }
-        val appliedLabels = resources.map { it.tfLabel }.toSet()
-        val relevantSubscriptions =
-            subscriptions.filter { sub ->
-                sub.endpointRef.split(".").getOrNull(1) in appliedLabels
-            }
+        val registry = resources.associateBy { it.id }
+        val relevantSubscriptions = subscriptions.filter { sub -> referencedResourceId(sub.endpointRef) in registry }
 
         _state.update { state ->
             state.copy(
@@ -266,8 +262,8 @@ class InfrastructureViewModel(
                 logLines = emptyList(),
                 resourceStatuses =
                     state.resourceStatuses +
-                        resources.associate { resource -> resource.tfLabel to ResourceOpStatus.PENDING } +
-                        relevantSubscriptions.associate { sub -> sub.tfLabel to ResourceOpStatus.PENDING },
+                        resources.associate { resource -> resource.id to ResourceOpStatus.PENDING } +
+                        relevantSubscriptions.associate { sub -> sub.resourceId to ResourceOpStatus.PENDING },
             )
         }
 
@@ -297,11 +293,11 @@ class InfrastructureViewModel(
         val command = resource.resourceType?.createCommand(resource.awsName, resource.extraProperties)
         if (command == null) {
             appendLog(ProcessLine(ctx.logStrings.unsupportedFmt.replace("{type}", typeName), true))
-            setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)
+            setResourceStatus(resource.id, ResourceOpStatus.ERROR)
             return
         }
 
-        setResourceStatus(resource.tfLabel, ResourceOpStatus.PENDING)
+        setResourceStatus(resource.id, ResourceOpStatus.PENDING)
 
         val config = ProcessConfig(envVars = ctx.env, timeoutSeconds = resource.resourceType.createTimeoutSeconds)
         ProcessRunner.run(command, config).fold(
@@ -309,15 +305,15 @@ class InfrastructureViewModel(
                 output.stdout.lines().filter { it.isNotBlank() }.forEach { line -> appendLog(ProcessLine(line, false)) }
                 val succeeded = output.exitCode == 0 || output.exitCode == EXIT_CODE_ALREADY_EXISTS
                 if (succeeded) {
-                    setResourceStatus(resource.tfLabel, ResourceOpStatus.SUCCESS)
+                    setResourceStatus(resource.id, ResourceOpStatus.SUCCESS)
                     appendLog(ProcessLine(ctx.logStrings.createdFmt.replace("{name}", resource.awsName), false))
                 } else {
-                    setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)
+                    setResourceStatus(resource.id, ResourceOpStatus.ERROR)
                     appendLog(ProcessLine(ctx.logStrings.createErrorFmt.replace("{name}", resource.awsName), true))
                 }
             },
             onFailure = {
-                setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)
+                setResourceStatus(resource.id, ResourceOpStatus.ERROR)
                 appendLog(ProcessLine(ctx.logStrings.createErrorFmt.replace("{name}", resource.awsName), true))
             },
         )
@@ -345,14 +341,14 @@ class InfrastructureViewModel(
         ctx: ApplyContext,
         provision: suspend () -> Result<Unit>,
     ) {
-        setResourceStatus(resource.tfLabel, ResourceOpStatus.PENDING)
+        setResourceStatus(resource.id, ResourceOpStatus.PENDING)
         provision()
             .onSuccess {
-                setResourceStatus(resource.tfLabel, ResourceOpStatus.SUCCESS)
+                setResourceStatus(resource.id, ResourceOpStatus.SUCCESS)
                 appendLog(ProcessLine(ctx.logStrings.createdFmt.replace("{name}", resource.awsName), false))
             }
             .onFailure { failure ->
-                setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)
+                setResourceStatus(resource.id, ResourceOpStatus.ERROR)
                 failure.message?.let { appendLog(ProcessLine(it, true)) }
                 appendLog(ProcessLine(ctx.logStrings.createErrorFmt.replace("{name}", resource.awsName), true))
             }
@@ -364,7 +360,7 @@ class InfrastructureViewModel(
         ctx: ApplyContext,
     ) {
         appendLog(ProcessLine(ctx.logStrings.subscribingFmt.replace("{label}", sub.tfLabel), false))
-        setResourceStatus(sub.tfLabel, ResourceOpStatus.PENDING)
+        setResourceStatus(sub.resourceId, ResourceOpStatus.PENDING)
 
         val topicArn = resolveArn(sub.topicRef, registry)
         val endpointArn = resolveArn(sub.endpointRef, registry)
@@ -375,13 +371,13 @@ class InfrastructureViewModel(
                 ProcessConfig(envVars = ctx.env),
             ).getOrElse {
                 appendLog(ProcessLine(ctx.logStrings.subscribeErrorFmt.replace("{label}", sub.tfLabel), true))
-                setResourceStatus(sub.tfLabel, ResourceOpStatus.ERROR)
+                setResourceStatus(sub.resourceId, ResourceOpStatus.ERROR)
                 return
             }
 
         if (output.exitCode != 0) {
             appendLog(ProcessLine(ctx.logStrings.subscribeErrorFmt.replace("{label}", sub.tfLabel), true))
-            setResourceStatus(sub.tfLabel, ResourceOpStatus.ERROR)
+            setResourceStatus(sub.resourceId, ResourceOpStatus.ERROR)
             return
         }
 
@@ -398,7 +394,7 @@ class InfrastructureViewModel(
         }
 
         appendLog(ProcessLine(ctx.logStrings.subscribedFmt.replace("{label}", sub.tfLabel), false))
-        setResourceStatus(sub.tfLabel, ResourceOpStatus.SUCCESS)
+        setResourceStatus(sub.resourceId, ResourceOpStatus.SUCCESS)
     }
 
     private suspend fun applyFilterPolicy(
@@ -433,19 +429,21 @@ class InfrastructureViewModel(
         return if (parts.size < 2) {
             ref
         } else {
-            val name = registry[parts[1]]?.awsName ?: parts[1]
+            val name = registry[referencedResourceId(ref)]?.awsName ?: parts[1]
             ResourceRegistry.fromTerraformPrefix(parts[0])?.buildArn(name) ?: ref
         }
     }
+
+    private fun referencedResourceId(reference: String): String = reference.split(".").take(2).joinToString(".")
 
     private fun appendLog(line: ProcessLine) {
         _state.update { it.copy(logLines = it.logLines + line) }
     }
 
     private fun setResourceStatus(
-        tfLabel: String,
+        resourceId: String,
         status: ResourceOpStatus,
     ) {
-        _state.update { it.copy(resourceStatuses = it.resourceStatuses + (tfLabel to status)) }
+        _state.update { it.copy(resourceStatuses = it.resourceStatuses + (resourceId to status)) }
     }
 }
