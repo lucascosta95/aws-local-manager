@@ -28,6 +28,7 @@ data class QuickUiState(
     val glueDataFormat: GlueSchemaDataFormat = GlueSchemaDataFormat.AVRO,
     val glueCompatibility: String = GlueSchemaResource.DEFAULT_COMPATIBILITY,
     val glueSchemaDefinition: String = EMPTY_STRING,
+    val pendingChild: PendingChildResource? = null,
     val isCreating: Boolean = false,
     val history: List<QuickHistoryItem> = emptyList(),
 ) {
@@ -39,3 +40,9 @@ data class QuickUiState(
                 (selectedType != MskTopicResource || selectedMskCluster != null) &&
                 (selectedType != GlueSchemaResource || (selectedGlueRegistry != null && glueSchemaDefinition.isNotBlank()))
 }
+
+// A topic or schema whose creation was interrupted to create its parent first; the form returns to it afterwards.
+data class PendingChildResource(
+    val type: AwsResourceDefinition,
+    val name: String,
+)

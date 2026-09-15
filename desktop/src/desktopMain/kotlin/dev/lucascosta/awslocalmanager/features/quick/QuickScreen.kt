@@ -23,8 +23,10 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,7 +34,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -107,6 +111,8 @@ fun QuickScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
+                state.pendingChild?.let { pending -> PendingChildHint(pending) }
+
                 when (state.selectedType) {
                     SqsResource ->
                         SqsOptions(
@@ -145,6 +151,7 @@ fun QuickScreen(
                             partitions = state.topicPartitions,
                             onClusterChange = viewModel::setMskCluster,
                             onPartitionsChange = viewModel::setTopicPartitions,
+                            onCreateCluster = viewModel::createParentFirst,
                         )
 
                     GlueSchemaResource ->
@@ -154,6 +161,7 @@ fun QuickScreen(
                             onDataFormatChange = viewModel::setGlueDataFormat,
                             onCompatibilityChange = viewModel::setGlueCompatibility,
                             onDefinitionChange = viewModel::setGlueSchemaDefinition,
+                            onCreateRegistry = viewModel::createParentFirst,
                         )
 
                     else -> {}
@@ -331,17 +339,14 @@ private fun GlueSchemaOptions(
     onDataFormatChange: (GlueSchemaDataFormat) -> Unit,
     onCompatibilityChange: (String) -> Unit,
     onDefinitionChange: (String) -> Unit,
+    onCreateRegistry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val strings = LocalQuickStrings.current
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(strings.quickGlueRegistry, style = MaterialTheme.typography.labelMedium)
         if (state.glueRegistries.isEmpty()) {
-            Text(
-                strings.quickGlueNoRegistries,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            MissingParentNotice(strings.quickGlueNoRegistries, strings.quickGlueCreateRegistry, onCreateRegistry)
         } else {
             ChipGroup(state.glueRegistries, state.selectedGlueRegistry, onRegistryChange) { it }
         }
@@ -388,17 +393,14 @@ private fun MskTopicOptions(
     partitions: Int,
     onClusterChange: (String) -> Unit,
     onPartitionsChange: (Int) -> Unit,
+    onCreateCluster: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val strings = LocalQuickStrings.current
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(strings.quickMskCluster, style = MaterialTheme.typography.labelMedium)
         if (clusters.isEmpty()) {
-            Text(
-                strings.quickMskNoClusters,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            MissingParentNotice(strings.quickMskNoClusters, strings.quickMskCreateCluster, onCreateCluster)
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 clusters.forEach { cluster ->
@@ -417,6 +419,45 @@ private fun MskTopicOptions(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+@Composable
+private fun MissingParentNotice(
+    message: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = onAction) {
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(actionLabel, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingChildHint(pending: PendingChildResource) {
+    val message =
+        LocalQuickStrings.current.quickReturnAfterCreate
+            .replace("{type}", pending.type.displayName)
+            .replace("{name}", pending.name)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

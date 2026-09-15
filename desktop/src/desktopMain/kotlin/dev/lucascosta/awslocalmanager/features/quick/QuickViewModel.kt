@@ -2,6 +2,7 @@ package dev.lucascosta.awslocalmanager.features.quick
 
 import dev.lucascosta.awslocalmanager.BaseViewModel
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DLQ_SUFFIX
+import dev.lucascosta.awslocalmanager.constants.AppConstants.EMPTY_STRING
 import dev.lucascosta.awslocalmanager.constants.AppConstants.PROCESS_DEFAULT_TIMEOUT_SECONDS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SQS_DLQ_CREATION_DELAY_MS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SQS_DLQ_TARGET_ARN_KEY
@@ -66,7 +67,44 @@ class QuickViewModel(
     private val timeFormatter = DateTimeFormatter.ofPattern(TIME_FORMAT_PATTERN)
 
     fun setType(type: AwsResourceDefinition) {
-        _state.update { it.copy(selectedType = type) }
+        _state.update { it.copy(selectedType = type, pendingChild = null) }
+        loadParentsFor(type)
+    }
+
+    fun createParentFirst() {
+        val current = _state.value
+        val parentType = parentTypeOf(current.selectedType) ?: return
+        _state.update {
+            it.copy(
+                selectedType = parentType,
+                resourceName = EMPTY_STRING,
+                pendingChild = PendingChildResource(current.selectedType, current.resourceName),
+            )
+        }
+    }
+
+    private fun parentTypeOf(type: AwsResourceDefinition): AwsResourceDefinition? =
+        when (type) {
+            MskTopicResource -> MskClusterResource
+            GlueSchemaResource -> GlueRegistryResource
+            else -> null
+        }
+
+    private fun returnToPendingChild(createdParent: String) {
+        val pending = _state.value.pendingChild ?: return
+        _state.update { state ->
+            state.copy(
+                selectedType = pending.type,
+                resourceName = pending.name,
+                pendingChild = null,
+                selectedMskCluster = if (pending.type == MskTopicResource) createdParent else state.selectedMskCluster,
+                selectedGlueRegistry = if (pending.type == GlueSchemaResource) createdParent else state.selectedGlueRegistry,
+            )
+        }
+        loadParentsFor(pending.type)
+    }
+
+    private fun loadParentsFor(type: AwsResourceDefinition) {
         when (type) {
             MskTopicResource -> loadMskClusters()
             GlueSchemaResource -> loadGlueRegistries()
@@ -180,6 +218,7 @@ class QuickViewModel(
                 }
             _state.update { it.copy(isCreating = false, history = newItems + it.history) }
             hostProxySupervisor.requestReconcile()
+            if (results.all { it.success }) returnToPendingChild(currentState.resourceName)
         }
     }
 

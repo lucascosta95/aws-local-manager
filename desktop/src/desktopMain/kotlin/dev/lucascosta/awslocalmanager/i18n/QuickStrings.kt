@@ -20,28 +20,37 @@ data class QuickStrings(
     val quickGlueDataFormat: String,
     val quickGlueCompatibility: String,
     val quickGlueDefinition: String,
+    val quickMskCreateCluster: String,
+    val quickGlueCreateRegistry: String,
+    val quickReturnAfterCreate: String,
 )
 
 val QuickStringsEnUs =
     QuickStrings(
         quickMskCluster = "Cluster",
-        quickMskNoClusters = "No MSK cluster running. Create a cluster first.",
+        quickMskNoClusters = "No MSK (Kafka) cluster found. Create a cluster first.",
         quickMskPartitions = "Partitions",
         quickGlueRegistry = "Registry",
         quickGlueNoRegistries = "No Glue registry found. Create a registry first.",
         quickGlueDataFormat = "Data format",
         quickGlueCompatibility = "Compatibility",
         quickGlueDefinition = "Schema definition",
+        quickMskCreateCluster = "Create cluster",
+        quickGlueCreateRegistry = "Create registry",
+        quickReturnAfterCreate = "Once it is created, you go back to {type} \"{name}\".",
     )
 
 val QuickStringsPtBr =
     QuickStrings(
         quickMskCluster = "Cluster",
-        quickMskNoClusters = "Nenhum cluster MSK em execução. Crie um cluster primeiro.",
+        quickMskNoClusters = "Nenhum cluster MSK (Kafka) encontrado. Crie um cluster primeiro.",
         quickMskPartitions = "Partições",
         quickGlueRegistry = "Registry",
         quickGlueNoRegistries = "Nenhum registry do Glue encontrado. Crie um registry primeiro.",
         quickGlueDataFormat = "Formato",
         quickGlueCompatibility = "Compatibilidade",
         quickGlueDefinition = "Definição do schema",
+        quickMskCreateCluster = "Criar cluster",
+        quickGlueCreateRegistry = "Criar registry",
+        quickReturnAfterCreate = "Depois de criar, você volta para {type} \"{name}\".",
     )
