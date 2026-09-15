@@ -35,6 +35,19 @@ object AppConstants {
     const val EMULATOR_PORT_MAPPING = "4566:4566"
     const val EMULATOR_HEALTH_PATH = "/_floci/health"
     const val DOCKER_SOCKET_BINDING = "/var/run/docker.sock:/var/run/docker.sock"
+    const val EMULATOR_DOCKER_NETWORK = "aws-local-manager"
+    const val FLOCI_DOCKER_NETWORK_ENV = "FLOCI_SERVICES_DOCKER_NETWORK"
+    const val FLOCI_MSK_IMAGE_ENV = "FLOCI_SERVICES_MSK_DEFAULT_IMAGE"
+    const val MSK_BROKER_IMAGE = "redpandadata/redpanda:v26.2.2"
+    const val MSK_BROKER_PORT = 9092
+    const val KAFKA_PROXY_IMAGE = "grepplabs/kafka-proxy:0.4.3"
+    const val KAFKA_PROXY_FIRST_HOST_PORT = 19092
+    const val KAFKA_PROXY_LAST_HOST_PORT = 19191
+    const val SCHEMA_REGISTRY_PORT = 8081
+    const val SCHEMA_REGISTRY_PROXY_IMAGE = "alpine/socat:1.8.1.3"
+    const val SCHEMA_REGISTRY_PROXY_FIRST_HOST_PORT = 18081
+    const val SCHEMA_REGISTRY_PROXY_LAST_HOST_PORT = 18180
+    const val LOOPBACK_HOST = "127.0.0.1"
 
     // Session log
     const val LOG_MAX_ENTRIES = 2000

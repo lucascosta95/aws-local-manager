@@ -61,7 +61,7 @@ internal fun ResourceListHeader(
                 FilterChip(
                     selected = typeFilter == type,
                     onClick = { onFilterChange(if (typeFilter == type) null else type) },
-                    label = { Text(type.id, style = MaterialTheme.typography.labelSmall) },
+                    label = { Text(type.displayName, style = MaterialTheme.typography.labelSmall) },
                 )
             }
         }

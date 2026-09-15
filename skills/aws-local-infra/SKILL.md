@@ -1,6 +1,6 @@
 ---
 name: aws-local-infra
-description: Sweep the open project for the AWS services it already uses, reading its code, configuration and .env files, then create or repair the infra/ folder that AWS Local Manager reads so the project can be debugged against a local AWS emulator. Use when the user wants to run or debug their service against local SQS, SNS, S3, DynamoDB, Step Functions, ElastiCache or SSM Parameter Store, mentions AWS Local Manager or Floci, or asks to create, fix or extend infra/, aws-local.config.json, the .tf templates or payloads.json.
+description: Sweep the open project for the AWS services it already uses, reading its code, configuration and .env files, then create or repair the infra/ folder that AWS Local Manager reads so the project can be debugged against a local AWS emulator. Use when the user wants to run or debug their service against local SQS, SNS, S3, DynamoDB, Step Functions, ElastiCache, SSM Parameter Store, MSK (Kafka) or Glue Schema Registry, mentions AWS Local Manager or Floci, or asks to create, fix or extend infra/, aws-local.config.json, the .tf templates or payloads.json.
 ---
 
 # AWS Local Manager infrastructure
@@ -64,7 +64,7 @@ read here never goes into `infra/`.
 
 ```bash
 rg -n -i --no-ignore --hidden -g '!{.git,node_modules,build,target,dist,.gradle,vendor}/**' \
-  -e 'sqs|sns|s3|dynamo|stepfunction|sfn|state.?machine|elasticache|redis|memcached|ssm|parameter.?store|localstack'
+  -e 'sqs|sns|s3|dynamo|stepfunction|sfn|state.?machine|elasticache|redis|memcached|ssm|parameter.?store|kafka|msk|localstack'
 
 rg -n -i --no-ignore --hidden -g '!{.git,node_modules,build,target,dist,.gradle,vendor}/**' \
   -e '(queue|topic|bucket|table|cluster|parameter)[_-]?(name|url|arn|id|path)?\s*[:=]'
@@ -73,7 +73,7 @@ rg -n -i --no-ignore --hidden -g '!{.git,node_modules,build,target,dist,.gradle,
 `rg` is not installed everywhere. `grep` takes the same patterns:
 
 ```bash
-grep -rIn -E -i 'sqs|sns|s3|dynamo|sfn|elasticache|redis|memcached|ssm' . \
+grep -rIn -E -i 'sqs|sns|s3|dynamo|sfn|elasticache|redis|memcached|ssm|kafka|msk' . \
   --exclude-dir={.git,node_modules,build,target,dist,.gradle,vendor}
 ```
 
@@ -89,7 +89,7 @@ Good places to look, by stack:
 | Python | `boto3.client("sqs")`, `queue_url`, `topic_arn`, `table_name` |
 | Go | `sqs.New`, `sns.New`, `s3.New`, `dynamodb.New`, `QueueUrl`, `TableName` |
 | .NET | `IAmazonSQS`, `IAmazonS3`, `appsettings*.json` |
-| Any | `.env*`, `docker-compose*.yml`, `serverless.yml`, `template.yaml`, Helm values, `*_QUEUE`, `*_TOPIC`, `*_BUCKET`, `*_TABLE`, `*_PARAMETER` |
+| Any | `.env*`, `docker-compose*.yml`, `serverless.yml`, `template.yaml`, Helm values, `*_QUEUE`, `*_TOPIC`, `*_BUCKET`, `*_TABLE`, `*_PARAMETER`, `*_KAFKA_*` |
 
 An existing `terraform/` folder, a `serverless.yml` or a SAM `template.yaml` is the best source of
 all: it is the real deployed infrastructure. Take the names from it, but do not copy the files into
@@ -108,8 +108,11 @@ all: it is the real deployed infrastructure. Take the names from it, but do not 
 | `sfn`, `StateMachineArn`, `startExecution` | `aws_sfn_state_machine` |
 | `redis`, `memcached`, a Lettuce / Jedis / ioredis client | `aws_elasticache_cluster` |
 | `ssm`, `getParameter`, a `/path/like/this` config key | `aws_ssm_parameter` |
+| `bootstrap.servers`, `@KafkaListener`, `KafkaTemplate`, kafkajs, confluent-kafka | one `aws_msk_cluster` |
+| each topic the code produces to or consumes from | `aws_msk_topic` pointing at that cluster |
+| `schema-registry-serde`, `AWSKafkaAvroSerializer`, `registry.name` | `aws_glue_registry` plus one `aws_glue_schema` per schema |
 
-Only the seven types above exist in AWS Local Manager. When the project uses something else, such
+Only the types above exist in AWS Local Manager. When the project uses something else, such
 as Kinesis, EventBridge or Secrets Manager, say so plainly and leave it out instead of inventing a
 resource the app cannot create.
 
@@ -279,11 +282,81 @@ A `SecureString` value written into a `.tf` file is a secret in plain text in th
 repository, and the Inspector shows it decrypted. Keep local debugging on `String` and
 never move a real secret into these files.
 
+### MSK (Kafka)
+
+Declare one cluster and one `aws_msk_topic` per topic. `cluster_arn` must reference an
+`aws_msk_cluster` declared in any file of `infra/`, or carry a literal ARN; a topic whose
+cluster cannot be found is skipped. The cluster name comes from `cluster_name`, and a topic
+without `name` is skipped. Unlike the other types, the numbers here may be unquoted.
+
+```hcl
+resource "aws_msk_cluster" "orders" {
+  cluster_name           = "orders-kafka"
+  kafka_version          = "3.6.0"
+  number_of_broker_nodes = 1
+
+  broker_node_group_info {
+    instance_type  = "kafka.t3.small"
+    client_subnets = ["subnet-local"]
+  }
+}
+
+resource "aws_msk_topic" "order_created" {
+  name               = "order-created"
+  cluster_arn        = aws_msk_cluster.orders.arn
+  partition_count    = 3
+  replication_factor = 1
+}
+```
+
+The emulator runs a single Redpanda broker per cluster, so topics get replication factor 1
+and `configs` is not applied. Topics must be declared: they are not created automatically on
+first produce.
+
+Tell the user how the application reaches the broker. For a service started on the host, for
+example from an IDE, AWS Local Manager runs a proxy per active cluster: use
+`localhost:19092` for the first cluster (the next ones get `19093`, `19094`, …; the Inspector
+shows the exact port). For a service running in a container, join the `aws-local-manager`
+Docker network (`networks: aws-local-manager: external: true` in Compose) and use the
+`floci-msk-<id>:9092` address the Inspector shows. Do not use the address returned by
+`get-bootstrap-brokers`: it only works for the first connection.
+
+When the code uses the Confluent serializers (`kafka-avro-serializer`, `schema.registry.url`),
+there is nothing to declare: each cluster already runs a Confluent-compatible registry. Tell the
+user to set `schema.registry.url` to `http://localhost:18081` for a service on the host, or
+`http://floci-msk-<id>:8081` from a container on the network.
+
+### Glue Schema Registry
+
+Use this when the code serializes with the AWS Glue SerDe. `schema_name`, `data_format`
+(`AVRO`, `JSON`, `PROTOBUF`) and `schema_definition` are required. Prefer `file()` pointing at the
+schema file the project already has, so the definition is not duplicated; a heredoc or a quoted
+string also works, but `jsonencode()` is not read.
+
+```hcl
+resource "aws_glue_registry" "payments" {
+  registry_name = "payments"
+}
+
+resource "aws_glue_schema" "payment_approved" {
+  schema_name       = "payment-approved"
+  registry_arn      = aws_glue_registry.payments.arn
+  data_format       = "AVRO"
+  compatibility     = "BACKWARD"
+  schema_definition = file("${path.module}/../src/main/avro/payment-approved.avsc")
+}
+```
+
+The SerDe reaches the registry through the AWS endpoint: in the local profile set its
+`endpoint` property to `http://localhost:4566` and `region` to `us-east-1`, with the `test`
+credentials.
+
 ## Step 5: payloads.json (optional)
 
 Saved payloads for the Running screen. Every entry requires `name`, `queue` and `payload`.
 `queue` is the only targeting field: there is no `topic` key. To target an SNS topic, put
-the topic name, or the name of a queue subscribed to it, in `queue`.
+the topic name, or the name of a queue subscribed to it, in `queue`. For a Kafka topic, put
+the topic name or `<cluster name>/<topic name>` in `queue`.
 
 A single malformed entry makes the whole file load as empty, silently. Keep the shape exact.
 
@@ -325,6 +398,8 @@ Confirm each item:
 - No block label contains `-` or `.`.
 - Every `aws_s3_bucket` label matches its `bucket` value, with `_` in place of `-`.
 - Every `aws_ssm_parameter` block has a `name`, otherwise the app skips it.
+- Every `aws_msk_topic` has a `name` and a `cluster_arn` that points at a declared `aws_msk_cluster`.
+- Every `aws_glue_schema` has `schema_name`, `data_format` and a `schema_definition` that is not `jsonencode()`.
 - Every `.tf` file is directly in `infra/`, none in a subfolder.
 - Every `payloads.json` entry has `name`, `queue` and `payload`.
 - Resource names match the names the application code actually uses.

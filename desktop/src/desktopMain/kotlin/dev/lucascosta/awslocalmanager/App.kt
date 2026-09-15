@@ -34,6 +34,10 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.WINDOW_WIDTH_DP
 import dev.lucascosta.awslocalmanager.data.model.aws.ResourceRegistry
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueRegistryResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskClusterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsSubscriptionResource
@@ -44,12 +48,15 @@ import dev.lucascosta.awslocalmanager.data.remote.EmulatorClient
 import dev.lucascosta.awslocalmanager.data.repository.AppPreferences
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import dev.lucascosta.awslocalmanager.di.appModules
+import dev.lucascosta.awslocalmanager.domain.HostProxySupervisor
 import dev.lucascosta.awslocalmanager.features.dashboard.DashboardViewModel
 import dev.lucascosta.awslocalmanager.features.infrastructure.InfrastructureViewModel
 import dev.lucascosta.awslocalmanager.features.inspector.InspectorViewModel
 import dev.lucascosta.awslocalmanager.features.inspector.handler.DynamoInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.ElastiCacheInspectorHandler
+import dev.lucascosta.awslocalmanager.features.inspector.handler.GlueSchemaRegistryInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.InspectorHandlerRegistry
+import dev.lucascosta.awslocalmanager.features.inspector.handler.MskInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.S3InspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SsmInspectorHandler
@@ -62,13 +69,17 @@ import dev.lucascosta.awslocalmanager.features.settings.SettingsViewModel
 import dev.lucascosta.awslocalmanager.features.setup.SetupViewModel
 import dev.lucascosta.awslocalmanager.features.skills.SkillsViewModel
 import dev.lucascosta.awslocalmanager.features.update.UpdateViewModel
+import dev.lucascosta.awslocalmanager.i18n.LocalDashboardStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalLanguage
 import dev.lucascosta.awslocalmanager.i18n.LocalLogsStrings
+import dev.lucascosta.awslocalmanager.i18n.LocalQuickStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalSkillsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
+import dev.lucascosta.awslocalmanager.i18n.dashboardStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.inspectorStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.logsStringsForLanguage
+import dev.lucascosta.awslocalmanager.i18n.quickStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.skillsStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.stringsForLanguage
 import dev.lucascosta.awslocalmanager.navigation.AppNavigation
@@ -95,6 +106,10 @@ fun main() {
         SnsSubscriptionResource,
         ElastiCacheResource,
         SsmParameterResource,
+        MskClusterResource,
+        MskTopicResource,
+        GlueRegistryResource,
+        GlueSchemaResource,
     )
 
     InspectorHandlerRegistry.register(SqsInspectorHandler())
@@ -103,6 +118,8 @@ fun main() {
     InspectorHandlerRegistry.register(S3InspectorHandler())
     InspectorHandlerRegistry.register(ElastiCacheInspectorHandler())
     InspectorHandlerRegistry.register(SsmInspectorHandler())
+    InspectorHandlerRegistry.register(MskInspectorHandler())
+    InspectorHandlerRegistry.register(GlueSchemaRegistryInspectorHandler())
 
     val appIcon = loadAppIcon()
 
@@ -150,6 +167,7 @@ fun AppRoot() {
     val preferencesRepository: PreferencesRepository = koinInject()
     val settingsViewModel: SettingsViewModel = koinInject()
     val updateViewModel: UpdateViewModel = koinInject()
+    val hostProxySupervisor: HostProxySupervisor = koinInject()
 
     val allViewModels =
         listOf(
@@ -167,7 +185,9 @@ fun AppRoot() {
         )
 
     DisposableEffect(Unit) {
+        hostProxySupervisor.start()
         onDispose {
+            hostProxySupervisor.stop()
             emulatorClient.close()
             allViewModels.forEach { it.onCleared() }
         }
@@ -182,6 +202,8 @@ fun AppRoot() {
         LocalInspectorStrings provides inspectorStringsForLanguage(prefs.language),
         LocalSkillsStrings provides skillsStringsForLanguage(prefs.language),
         LocalLogsStrings provides logsStringsForLanguage(prefs.language),
+        LocalQuickStrings provides quickStringsForLanguage(prefs.language),
+        LocalDashboardStrings provides dashboardStringsForLanguage(prefs.language),
     ) {
         DesktopAppTheme(appTheme = prefs.theme) {
             AppContent(

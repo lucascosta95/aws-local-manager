@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,11 +18,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,7 +34,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -36,18 +44,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.lucascosta.awslocalmanager.data.model.aws.ResourceRegistry
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaDataFormat
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
+import dev.lucascosta.awslocalmanager.i18n.LocalQuickStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
 import dev.lucascosta.awslocalmanager.theme.LocalAppColors
 import org.koin.compose.koinInject
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun QuickScreen(
     viewModel: QuickViewModel = koinInject(),
@@ -61,73 +75,98 @@ fun QuickScreen(
             modifier = Modifier.weight(1f).fillMaxHeight().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(strings.quickTitle, style = MaterialTheme.typography.titleMedium)
-            Text(
-                strings.quickSubtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            HorizontalDivider()
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(strings.quickTitle, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    strings.quickSubtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HorizontalDivider()
 
-            Text(
-                strings.quickType,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ResourceRegistry.all().filter { it.isQuickCreatable }.forEach { type ->
-                    FilterChip(
-                        selected = state.selectedType == type,
-                        onClick = { viewModel.setType(type) },
-                        label = { Text(type.id, style = MaterialTheme.typography.labelSmall) },
-                    )
+                Text(
+                    strings.quickType,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ResourceRegistry.all().filter { it.isQuickCreatable }.forEach { type ->
+                        FilterChip(
+                            selected = state.selectedType == type,
+                            onClick = { viewModel.setType(type) },
+                            label = { Text(type.displayName, style = MaterialTheme.typography.labelSmall) },
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = state.resourceName,
+                    onValueChange = viewModel::setName,
+                    label = { Text(strings.quickName, style = MaterialTheme.typography.bodySmall) },
+                    placeholder = { Text(strings.quickNameHint, style = MaterialTheme.typography.bodySmall) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                state.pendingChild?.let { pending -> PendingChildHint(pending) }
+
+                when (state.selectedType) {
+                    SqsResource ->
+                        SqsOptions(
+                            createDlq = state.createDlq,
+                            dlqMaxReceive = state.dlqMaxReceiveCount,
+                            onCreateDlqChange = viewModel::setCreateDlq,
+                            onMaxReceiveChange = viewModel::setDlqMaxReceiveCount,
+                        )
+
+                    DynamoDbResource ->
+                        DynamoOptions(
+                            partitionKey = state.partitionKey,
+                            keyType = state.partitionKeyType,
+                            onKeyChange = viewModel::setPartitionKey,
+                            onTypeChange = viewModel::setPartitionKeyType,
+                        )
+
+                    ElastiCacheResource ->
+                        ElastiCacheOptions(
+                            engine = state.elastiCacheEngine,
+                            onEngineChange = viewModel::setElastiCacheEngine,
+                        )
+
+                    SsmParameterResource ->
+                        SsmParameterOptions(
+                            value = state.parameterValue,
+                            type = state.parameterType,
+                            onValueChange = viewModel::setParameterValue,
+                            onTypeChange = viewModel::setParameterType,
+                        )
+
+                    MskTopicResource ->
+                        MskTopicOptions(
+                            clusters = state.mskClusters,
+                            selectedCluster = state.selectedMskCluster,
+                            partitions = state.topicPartitions,
+                            onClusterChange = viewModel::setMskCluster,
+                            onPartitionsChange = viewModel::setTopicPartitions,
+                            onCreateCluster = viewModel::createParentFirst,
+                        )
+
+                    GlueSchemaResource ->
+                        GlueSchemaOptions(
+                            state = state,
+                            onRegistryChange = viewModel::setGlueRegistry,
+                            onDataFormatChange = viewModel::setGlueDataFormat,
+                            onCompatibilityChange = viewModel::setGlueCompatibility,
+                            onDefinitionChange = viewModel::setGlueSchemaDefinition,
+                            onCreateRegistry = viewModel::createParentFirst,
+                        )
+
+                    else -> {}
                 }
             }
-
-            OutlinedTextField(
-                value = state.resourceName,
-                onValueChange = viewModel::setName,
-                label = { Text(strings.quickName, style = MaterialTheme.typography.bodySmall) },
-                placeholder = { Text(strings.quickNameHint, style = MaterialTheme.typography.bodySmall) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            when (state.selectedType) {
-                SqsResource ->
-                    SqsOptions(
-                        createDlq = state.createDlq,
-                        dlqMaxReceive = state.dlqMaxReceiveCount,
-                        onCreateDlqChange = viewModel::setCreateDlq,
-                        onMaxReceiveChange = viewModel::setDlqMaxReceiveCount,
-                    )
-
-                DynamoDbResource ->
-                    DynamoOptions(
-                        partitionKey = state.partitionKey,
-                        keyType = state.partitionKeyType,
-                        onKeyChange = viewModel::setPartitionKey,
-                        onTypeChange = viewModel::setPartitionKeyType,
-                    )
-
-                ElastiCacheResource ->
-                    ElastiCacheOptions(
-                        engine = state.elastiCacheEngine,
-                        onEngineChange = viewModel::setElastiCacheEngine,
-                    )
-
-                SsmParameterResource ->
-                    SsmParameterOptions(
-                        value = state.parameterValue,
-                        type = state.parameterType,
-                        onValueChange = viewModel::setParameterValue,
-                        onTypeChange = viewModel::setParameterType,
-                    )
-
-                else -> {}
-            }
-
-            Spacer(Modifier.weight(1f))
 
             Button(
                 onClick = viewModel::create,
@@ -292,6 +331,136 @@ private fun SsmParameterOptions(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GlueSchemaOptions(
+    state: QuickUiState,
+    onRegistryChange: (String) -> Unit,
+    onDataFormatChange: (GlueSchemaDataFormat) -> Unit,
+    onCompatibilityChange: (String) -> Unit,
+    onDefinitionChange: (String) -> Unit,
+    onCreateRegistry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val strings = LocalQuickStrings.current
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(strings.quickGlueRegistry, style = MaterialTheme.typography.labelMedium)
+        if (state.glueRegistries.isEmpty()) {
+            MissingParentNotice(strings.quickGlueNoRegistries, strings.quickGlueCreateRegistry, onCreateRegistry)
+        } else {
+            ChipGroup(state.glueRegistries, state.selectedGlueRegistry, onRegistryChange) { it }
+        }
+        Text(strings.quickGlueDataFormat, style = MaterialTheme.typography.labelMedium)
+        ChipGroup(GlueSchemaDataFormat.entries, state.glueDataFormat, onDataFormatChange) { it.name }
+        Text(strings.quickGlueCompatibility, style = MaterialTheme.typography.labelMedium)
+        ChipGroup(GlueSchemaResource.COMPATIBILITY_MODES, state.glueCompatibility, onCompatibilityChange) { it }
+        OutlinedTextField(
+            value = state.glueSchemaDefinition,
+            onValueChange = onDefinitionChange,
+            label = { Text(strings.quickGlueDefinition, style = MaterialTheme.typography.bodySmall) },
+            minLines = 6,
+            maxLines = 12,
+            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> ChipGroup(
+    options: List<T>,
+    selected: T?,
+    onSelect: (T) -> Unit,
+    label: (T) -> String,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        options.forEach { option ->
+            FilterChip(
+                selected = selected == option,
+                onClick = { onSelect(option) },
+                label = { Text(label(option), style = MaterialTheme.typography.labelSmall) },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MskTopicOptions(
+    clusters: List<String>,
+    selectedCluster: String?,
+    partitions: Int,
+    onClusterChange: (String) -> Unit,
+    onPartitionsChange: (Int) -> Unit,
+    onCreateCluster: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val strings = LocalQuickStrings.current
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(strings.quickMskCluster, style = MaterialTheme.typography.labelMedium)
+        if (clusters.isEmpty()) {
+            MissingParentNotice(strings.quickMskNoClusters, strings.quickMskCreateCluster, onCreateCluster)
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                clusters.forEach { cluster ->
+                    FilterChip(
+                        selected = selectedCluster == cluster,
+                        onClick = { onClusterChange(cluster) },
+                        label = { Text(cluster, style = MaterialTheme.typography.labelSmall) },
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = partitions.toString(),
+            onValueChange = { it.toIntOrNull()?.let { value -> onPartitionsChange(value.coerceIn(1, 100)) } },
+            label = { Text(strings.quickMskPartitions, style = MaterialTheme.typography.bodySmall) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun MissingParentNotice(
+    message: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = onAction) {
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(actionLabel, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingChildHint(pending: PendingChildResource) {
+    val message =
+        LocalQuickStrings.current.quickReturnAfterCreate
+            .replace("{type}", pending.type.displayName)
+            .replace("{name}", pending.name)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 @Composable
 private fun HistoryRow(
     item: QuickHistoryItem,
@@ -323,7 +492,7 @@ private fun HistoryRow(
         )
 
         Text(
-            item.type.id,
+            item.type.displayName,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
         )

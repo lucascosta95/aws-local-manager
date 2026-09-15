@@ -11,6 +11,7 @@ import dev.lucascosta.awslocalmanager.data.model.aws.RunningResource
 import dev.lucascosta.awslocalmanager.data.model.aws.SavedPayload
 import dev.lucascosta.awslocalmanager.data.model.aws.resourceId
 import dev.lucascosta.awslocalmanager.data.model.project.InfraProject
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
@@ -267,10 +268,10 @@ class RunningViewModel(
                 }
 
             val queueNames =
-                if (target.type == SnsResource) {
-                    withContext(Dispatchers.IO) { resolveSubscribedSqsNames(target.name, projects) }
-                } else {
-                    setOf(target.name)
+                when (target.type) {
+                    SnsResource -> withContext(Dispatchers.IO) { resolveSubscribedSqsNames(target.name, projects) }
+                    MskTopicResource -> setOf(target.name, MskTopicResource.topicOf(target.name))
+                    else -> setOf(target.name)
                 }
 
             val payloads =

@@ -1,5 +1,7 @@
 package dev.lucascosta.awslocalmanager.data.model.aws
 
+import dev.lucascosta.awslocalmanager.constants.AppConstants.PROCESS_DEFAULT_TIMEOUT_SECONDS
+
 enum class SuccessSnackbarKey { GENERIC, S3, DYNAMODB }
 
 interface AwsResourceDefinition {
@@ -15,6 +17,7 @@ interface AwsResourceDefinition {
     val publishableViaJson: Boolean
     val supportsPayloads: Boolean
     val successSnackbarKey: SuccessSnackbarKey
+    val createTimeoutSeconds: Long get() = PROCESS_DEFAULT_TIMEOUT_SECONDS
 
     fun createCommand(
         name: String,

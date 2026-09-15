@@ -9,11 +9,15 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_SOCKET_BINDI
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DOCKER_UNTAGGED
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMPTY_STRING
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_CONTAINER_NAME
+import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_DOCKER_NETWORK
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_PORT_MAPPING
 import dev.lucascosta.awslocalmanager.constants.AppConstants.EMULATOR_READY_POLL_MAX_ATTEMPTS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.FIX_SETTLE_DELAY_MS
+import dev.lucascosta.awslocalmanager.constants.AppConstants.FLOCI_DOCKER_NETWORK_ENV
 import dev.lucascosta.awslocalmanager.constants.AppConstants.FLOCI_IMAGE
+import dev.lucascosta.awslocalmanager.constants.AppConstants.FLOCI_MSK_IMAGE_ENV
 import dev.lucascosta.awslocalmanager.constants.AppConstants.FLOCI_REPOSITORY
+import dev.lucascosta.awslocalmanager.constants.AppConstants.MSK_BROKER_IMAGE
 import dev.lucascosta.awslocalmanager.constants.AppConstants.OS_MAC_IDENTIFIER
 import dev.lucascosta.awslocalmanager.constants.AppConstants.OS_NAME_PROPERTY
 import dev.lucascosta.awslocalmanager.data.model.health.CheckStatus
@@ -176,10 +180,20 @@ class SetupViewModel(
                 .toList()
         }
 
-    private suspend fun containerImage(): String? =
+    private suspend fun containerImage(): String? = inspectContainer("{{.Config.Image}}")
+
+    private suspend fun containerNetwork(): String? = inspectContainer("{{.HostConfig.NetworkMode}}")
+
+    private suspend fun containerEnvironment(): List<String> =
+        inspectContainer("{{range .Config.Env}}{{println .}}{{end}}")
+            ?.lines()
+            ?.map { it.trim() }
+            .orEmpty()
+
+    private suspend fun inspectContainer(format: String): String? =
         withContext(Dispatchers.IO) {
             ProcessRunner
-                .run(listOf("docker", "inspect", "--format", "{{.Config.Image}}", EMULATOR_CONTAINER_NAME))
+                .run(listOf("docker", "inspect", "--format", format, EMULATOR_CONTAINER_NAME))
                 .getOrNull()
                 ?.takeIf { it.exitCode == 0 }
                 ?.stdout
@@ -187,10 +201,22 @@ class SetupViewModel(
                 ?.ifBlank { null }
         }
 
+    private suspend fun isContainerOutdated(): Boolean {
+        val createdFrom = containerImage() ?: return false
+        if (createdFrom != FLOCI_IMAGE) return true
+        if (containerNetwork() != EMULATOR_DOCKER_NETWORK) return true
+        return !containerEnvironment().containsAll(emulatorEnvironment())
+    }
+
+    private fun emulatorEnvironment(): List<String> =
+        listOf(
+            "$FLOCI_DOCKER_NETWORK_ENV=$EMULATOR_DOCKER_NETWORK",
+            "$FLOCI_MSK_IMAGE_ENV=$MSK_BROKER_IMAGE",
+        )
+
     private suspend fun checkAndUpdateEmulatorRunning(imagePresent: Boolean) {
         val endpoint = currentEndpoint()
-        val createdFrom = containerImage()
-        val outdatedContainer = createdFrom != null && createdFrom != FLOCI_IMAGE
+        val outdatedContainer = isContainerOutdated()
         val running = imagePresent && !outdatedContainer && emulatorClient.isReachable(endpoint)
 
         updateCheck(ID_EMULATOR_RUNNING) {
@@ -255,6 +281,7 @@ class SetupViewModel(
         }
 
         removeExistingContainerIfPresent()
+        createEmulatorNetworkIfMissing()
 
         val runError = startEmulatorContainer()
         return if (runError != null) {
@@ -276,20 +303,24 @@ class SetupViewModel(
         }
     }
 
+    private suspend fun createEmulatorNetworkIfMissing() {
+        val exists = checkCommand(listOf("docker", "network", "inspect", EMULATOR_DOCKER_NETWORK))
+        if (exists) return
+        appendFixLog("Creating Docker network $EMULATOR_DOCKER_NETWORK...")
+        val result = ProcessRunner.run(listOf("docker", "network", "create", EMULATOR_DOCKER_NETWORK)).getOrNull()
+        listOfNotNull(result?.stdout, result?.stderr).filter { it.isNotBlank() }.forEach { appendFixLog(it) }
+    }
+
     private suspend fun startEmulatorContainer(): String? {
         val command =
-            listOf(
-                "docker",
-                "run",
-                "-d",
-                "--name",
-                EMULATOR_CONTAINER_NAME,
-                "-p",
-                EMULATOR_PORT_MAPPING,
-                "-v",
-                DOCKER_SOCKET_BINDING,
-                FLOCI_IMAGE,
-            )
+            buildList {
+                addAll(listOf("docker", "run", "-d", "--name", EMULATOR_CONTAINER_NAME))
+                addAll(listOf("--network", EMULATOR_DOCKER_NETWORK))
+                addAll(listOf("-p", EMULATOR_PORT_MAPPING))
+                addAll(listOf("-v", DOCKER_SOCKET_BINDING))
+                emulatorEnvironment().forEach { variable -> addAll(listOf("-e", variable)) }
+                add(FLOCI_IMAGE)
+            }
 
         var lastLine = EMPTY_STRING
         ProcessRunner.runStreaming(command).collect { line ->

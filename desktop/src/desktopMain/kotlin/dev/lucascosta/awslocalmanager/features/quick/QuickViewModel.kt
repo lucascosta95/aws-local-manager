@@ -2,6 +2,8 @@ package dev.lucascosta.awslocalmanager.features.quick
 
 import dev.lucascosta.awslocalmanager.BaseViewModel
 import dev.lucascosta.awslocalmanager.constants.AppConstants.DLQ_SUFFIX
+import dev.lucascosta.awslocalmanager.constants.AppConstants.EMPTY_STRING
+import dev.lucascosta.awslocalmanager.constants.AppConstants.PROCESS_DEFAULT_TIMEOUT_SECONDS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SQS_DLQ_CREATION_DELAY_MS
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SQS_DLQ_TARGET_ARN_KEY
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SQS_MAX_RECEIVE_COUNT_KEY
@@ -13,17 +15,29 @@ import dev.lucascosta.awslocalmanager.data.model.process.ProcessConfig
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueRegistryResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaDataFormat
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskClusterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.S3Resource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
 import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
+import dev.lucascosta.awslocalmanager.data.remote.AwsGlueSchemaRegistryClient
+import dev.lucascosta.awslocalmanager.data.remote.AwsMskClient
 import dev.lucascosta.awslocalmanager.data.remote.ElastiCacheCommands
 import dev.lucascosta.awslocalmanager.data.remote.EmulatorDefaults
+import dev.lucascosta.awslocalmanager.data.remote.GlueSchemaDefinition
+import dev.lucascosta.awslocalmanager.data.remote.GlueSchemaRegistryCommands
 import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.remote.SsmCommands
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
+import dev.lucascosta.awslocalmanager.domain.GlueSchemaProvisioner
+import dev.lucascosta.awslocalmanager.domain.HostProxySupervisor
+import dev.lucascosta.awslocalmanager.domain.MskTopicProvisioner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +55,11 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class QuickViewModel(
     private val preferencesRepository: PreferencesRepository,
+    private val mskTopicProvisioner: MskTopicProvisioner,
+    private val hostProxySupervisor: HostProxySupervisor,
+    private val glueSchemaProvisioner: GlueSchemaProvisioner,
+    private val mskClientFactory: (String) -> AwsMskClient = ::AwsMskClient,
+    private val glueClientFactory: (String) -> AwsGlueSchemaRegistryClient = ::AwsGlueSchemaRegistryClient,
 ) : BaseViewModel() {
     private val _state = MutableStateFlow(QuickUiState())
     val state: StateFlow<QuickUiState> = _state.asStateFlow()
@@ -48,7 +67,49 @@ class QuickViewModel(
     private val timeFormatter = DateTimeFormatter.ofPattern(TIME_FORMAT_PATTERN)
 
     fun setType(type: AwsResourceDefinition) {
-        _state.update { it.copy(selectedType = type) }
+        _state.update { it.copy(selectedType = type, pendingChild = null) }
+        loadParentsFor(type)
+    }
+
+    fun createParentFirst() {
+        val current = _state.value
+        val parentType = parentTypeOf(current.selectedType) ?: return
+        _state.update {
+            it.copy(
+                selectedType = parentType,
+                resourceName = EMPTY_STRING,
+                pendingChild = PendingChildResource(current.selectedType, current.resourceName),
+            )
+        }
+    }
+
+    private fun parentTypeOf(type: AwsResourceDefinition): AwsResourceDefinition? =
+        when (type) {
+            MskTopicResource -> MskClusterResource
+            GlueSchemaResource -> GlueRegistryResource
+            else -> null
+        }
+
+    private fun returnToPendingChild(createdParent: String) {
+        val pending = _state.value.pendingChild ?: return
+        _state.update { state ->
+            state.copy(
+                selectedType = pending.type,
+                resourceName = pending.name,
+                pendingChild = null,
+                selectedMskCluster = if (pending.type == MskTopicResource) createdParent else state.selectedMskCluster,
+                selectedGlueRegistry = if (pending.type == GlueSchemaResource) createdParent else state.selectedGlueRegistry,
+            )
+        }
+        loadParentsFor(pending.type)
+    }
+
+    private fun loadParentsFor(type: AwsResourceDefinition) {
+        when (type) {
+            MskTopicResource -> loadMskClusters()
+            GlueSchemaResource -> loadGlueRegistries()
+            else -> Unit
+        }
     }
 
     fun setName(name: String) {
@@ -83,6 +144,56 @@ class QuickViewModel(
         _state.update { it.copy(parameterType = type) }
     }
 
+    fun setMskCluster(cluster: String) {
+        _state.update { it.copy(selectedMskCluster = cluster) }
+    }
+
+    fun setTopicPartitions(partitions: Int) {
+        _state.update { it.copy(topicPartitions = partitions) }
+    }
+
+    fun setGlueRegistry(registry: String) {
+        _state.update { it.copy(selectedGlueRegistry = registry) }
+    }
+
+    fun setGlueDataFormat(format: GlueSchemaDataFormat) {
+        _state.update { it.copy(glueDataFormat = format) }
+    }
+
+    fun setGlueCompatibility(compatibility: String) {
+        _state.update { it.copy(glueCompatibility = compatibility) }
+    }
+
+    fun setGlueSchemaDefinition(definition: String) {
+        _state.update { it.copy(glueSchemaDefinition = definition) }
+    }
+
+    private fun loadGlueRegistries() {
+        scope.launch {
+            val endpoint = preferencesRepository.preferences.first().endpoint
+            val registries = glueClientFactory(endpoint).listRegistries().getOrElse { emptyList() }
+            _state.update { state ->
+                state.copy(
+                    glueRegistries = registries,
+                    selectedGlueRegistry = state.selectedGlueRegistry?.takeIf { it in registries } ?: registries.firstOrNull(),
+                )
+            }
+        }
+    }
+
+    private fun loadMskClusters() {
+        scope.launch {
+            val endpoint = preferencesRepository.preferences.first().endpoint
+            val clusters = mskClientFactory(endpoint).listClusters().getOrElse { emptyList() }.map { it.name }
+            _state.update { state ->
+                state.copy(
+                    mskClusters = clusters,
+                    selectedMskCluster = state.selectedMskCluster?.takeIf { it in clusters } ?: clusters.firstOrNull(),
+                )
+            }
+        }
+    }
+
     fun create() {
         val currentState = _state.value
         if (!currentState.canCreate) return
@@ -93,7 +204,7 @@ class QuickViewModel(
             val timestamp = LocalTime.now().format(timeFormatter)
             val results: List<ResourceCreationResult> =
                 withContext(Dispatchers.IO) {
-                    runCatching { dispatchCreate(currentState, env) }
+                    runCatching { dispatchCreate(currentState, endpoint, env) }
                         .getOrElse { listOf(ResourceCreationResult(currentState.resourceName, false)) }
                 }
             val newItems =
@@ -106,11 +217,14 @@ class QuickViewModel(
                     )
                 }
             _state.update { it.copy(isCreating = false, history = newItems + it.history) }
+            hostProxySupervisor.requestReconcile()
+            if (results.all { it.success }) returnToPendingChild(currentState.resourceName)
         }
     }
 
     private suspend fun dispatchCreate(
         state: QuickUiState,
+        endpoint: String,
         env: Map<String, String>,
     ): List<ResourceCreationResult> =
         when (state.selectedType) {
@@ -120,6 +234,16 @@ class QuickViewModel(
             DynamoDbResource -> listOf(ResourceCreationResult(state.resourceName, createDynamoDB(state, env)))
             ElastiCacheResource -> listOf(ResourceCreationResult(state.resourceName, createElastiCache(state, env)))
             SsmParameterResource -> listOf(ResourceCreationResult(state.resourceName, createSsmParameter(state, env)))
+            MskClusterResource -> listOf(ResourceCreationResult(state.resourceName, createMskCluster(state, env)))
+            MskTopicResource -> listOf(createMskTopic(state, endpoint))
+            GlueRegistryResource ->
+                listOf(
+                    ResourceCreationResult(
+                        state.resourceName,
+                        runCommand(GlueSchemaRegistryCommands.createRegistry(state.resourceName), env),
+                    ),
+                )
+            GlueSchemaResource -> listOf(createGlueSchema(state, endpoint))
             else -> listOf(ResourceCreationResult(state.resourceName, false))
         }
 
@@ -174,10 +298,50 @@ class QuickViewModel(
             env,
         )
 
+    private suspend fun createMskCluster(
+        state: QuickUiState,
+        env: Map<String, String>,
+    ): Boolean =
+        runCommand(
+            MskClusterResource.createCommand(state.resourceName, emptyMap()),
+            env,
+            MskClusterResource.createTimeoutSeconds,
+        )
+
+    private suspend fun createMskTopic(
+        state: QuickUiState,
+        endpoint: String,
+    ): ResourceCreationResult {
+        val cluster = state.selectedMskCluster ?: return ResourceCreationResult(state.resourceName, false)
+        val success = mskTopicProvisioner.createTopic(endpoint, cluster, state.resourceName, state.topicPartitions).isSuccess
+        return ResourceCreationResult(MskTopicResource.qualifiedName(cluster, state.resourceName), success)
+    }
+
+    private suspend fun createGlueSchema(
+        state: QuickUiState,
+        endpoint: String,
+    ): ResourceCreationResult {
+        val registry = state.selectedGlueRegistry ?: return ResourceCreationResult(state.resourceName, false)
+        val definition =
+            GlueSchemaDefinition(
+                registry = registry,
+                schema = state.resourceName,
+                dataFormat = state.glueDataFormat.name,
+                compatibility = state.glueCompatibility,
+                definition = state.glueSchemaDefinition,
+            )
+        val success = glueSchemaProvisioner.apply(endpoint, definition).isSuccess
+        return ResourceCreationResult(GlueSchemaResource.qualifiedName(registry, state.resourceName), success)
+    }
+
     private suspend fun runCommand(
         command: List<String>,
         env: Map<String, String>,
-    ): Boolean = ProcessRunner.run(command, ProcessConfig(envVars = env)).getOrElse { return false }.exitCode == 0
+        timeoutSeconds: Long = PROCESS_DEFAULT_TIMEOUT_SECONDS,
+    ): Boolean =
+        ProcessRunner.run(command, ProcessConfig(envVars = env, timeoutSeconds = timeoutSeconds)).getOrElse {
+            return false
+        }.exitCode == 0
 
     private fun buildRedriveAttributes(
         dlqName: String,

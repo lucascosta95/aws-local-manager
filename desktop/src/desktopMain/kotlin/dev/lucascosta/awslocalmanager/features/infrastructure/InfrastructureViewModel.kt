@@ -12,6 +12,8 @@ import dev.lucascosta.awslocalmanager.data.model.project.ApplyContext
 import dev.lucascosta.awslocalmanager.data.model.project.InfraLogStrings
 import dev.lucascosta.awslocalmanager.data.model.project.InfraProject
 import dev.lucascosta.awslocalmanager.data.model.project.TerraformResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsSubscriptionResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.remote.AwsCommands
@@ -20,6 +22,9 @@ import dev.lucascosta.awslocalmanager.data.remote.ProcessRunner
 import dev.lucascosta.awslocalmanager.data.repository.PreferencesRepository
 import dev.lucascosta.awslocalmanager.domain.AppLogger
 import dev.lucascosta.awslocalmanager.domain.AwsResourceChecker
+import dev.lucascosta.awslocalmanager.domain.GlueSchemaProvisioner
+import dev.lucascosta.awslocalmanager.domain.HostProxySupervisor
+import dev.lucascosta.awslocalmanager.domain.MskTopicProvisioner
 import dev.lucascosta.awslocalmanager.domain.ServiceStatusChecker
 import dev.lucascosta.awslocalmanager.domain.TerraformReader
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +47,9 @@ class InfrastructureViewModel(
     private val terraformReader: TerraformReader,
     private val serviceStatusChecker: ServiceStatusChecker,
     private val resourceChecker: AwsResourceChecker,
+    private val mskTopicProvisioner: MskTopicProvisioner,
+    private val glueSchemaProvisioner: GlueSchemaProvisioner,
+    private val hostProxySupervisor: HostProxySupervisor,
 ) : BaseViewModel() {
     private companion object {
         const val LOG_SOURCE = "Infrastructure"
@@ -52,7 +60,7 @@ class InfrastructureViewModel(
             selectedResources: Set<String>,
         ): Boolean =
             selectedResources.isNotEmpty() &&
-                project?.resources?.map { it.tfLabel }?.toSet() == selectedResources
+                project?.resources?.map { it.id }?.toSet() == selectedResources
 
         fun computeAvailableTypes(project: InfraProject): List<AwsResourceDefinition> =
             project.resources
@@ -79,11 +87,11 @@ class InfrastructureViewModel(
 
     fun loadProject(project: InfraProject) {
         _state.update {
-            val selected = project.resources.map { resource -> resource.tfLabel }.toSet()
+            val selected = project.resources.map { resource -> resource.id }.toSet()
             it.copy(
                 project = project,
                 selectedResources = selected,
-                resourceStatuses = project.resources.associate { resource -> resource.tfLabel to ResourceOpStatus.IDLE },
+                resourceStatuses = project.resources.associate { resource -> resource.id to ResourceOpStatus.IDLE },
                 logLines = emptyList(),
                 error = null,
                 allSelected = computeAllSelected(project, selected),
@@ -100,11 +108,11 @@ class InfrastructureViewModel(
         scope.launch(Dispatchers.IO) { doRefresh(currentProject) }
     }
 
-    fun toggleResource(tfLabel: String) {
+    fun toggleResource(resourceId: String) {
         _state.update {
             val updated =
                 it.selectedResources.toMutableSet().apply {
-                    if (tfLabel in this) remove(tfLabel) else add(tfLabel)
+                    if (resourceId in this) remove(resourceId) else add(resourceId)
                 }
             it.copy(selectedResources = updated, allSelected = computeAllSelected(it.project, updated))
         }
@@ -112,7 +120,7 @@ class InfrastructureViewModel(
 
     fun selectAll() {
         val project = _state.value.project ?: return
-        val all = project.resources.map { resource -> resource.tfLabel }.toSet()
+        val all = project.resources.map { resource -> resource.id }.toSet()
         _state.update { it.copy(selectedResources = all, allSelected = computeAllSelected(project, all)) }
     }
 
@@ -177,7 +185,7 @@ class InfrastructureViewModel(
             val toApply =
                 project.resources
                     .filter { it.isSupported && it.resourceType != SnsSubscriptionResource }
-                    .filter { _state.value.selectedResources.isEmpty() || it.tfLabel in _state.value.selectedResources }
+                    .filter { _state.value.selectedResources.isEmpty() || it.id in _state.value.selectedResources }
                     .sortedBy { it.resourceType?.creationPriority ?: Int.MAX_VALUE }
             val subscriptions = terraformReader.readSnsSubscriptions(project.directory)
             runDirect(toApply, subscriptions, prefs.endpoint, logStrings)
@@ -191,7 +199,7 @@ class InfrastructureViewModel(
             _state.update {
                 it.copy(
                     isCheckingRunning = true,
-                    runningStatus = project.resources.associate { resource -> resource.tfLabel to ResourceRunningStatus.CHECKING },
+                    runningStatus = project.resources.associate { resource -> resource.id to ResourceRunningStatus.CHECKING },
                 )
             }
 
@@ -209,7 +217,7 @@ class InfrastructureViewModel(
                                     val serviceActive = statuses[resourceType] != AppServiceStatus.ERROR
                                     if (!serviceActive) ResourceRunningStatus.NOT_RUNNING else checkResourceExists(resource, endpoint)
                                 }
-                            resource.tfLabel to status
+                            resource.id to status
                         }
                     }.awaitAll()
                     .toMap()
@@ -220,12 +228,12 @@ class InfrastructureViewModel(
     private fun doRefresh(project: InfraProject) {
         val updatedResources = terraformReader.readResources(project.directory)
         val updatedProject = project.copy(resources = updatedResources)
-        val selected = updatedResources.map { resource -> resource.tfLabel }.toSet()
+        val selected = updatedResources.map { resource -> resource.id }.toSet()
         _state.update {
             it.copy(
                 project = updatedProject,
                 selectedResources = selected,
-                resourceStatuses = updatedProject.resources.associate { resource -> resource.tfLabel to ResourceOpStatus.IDLE },
+                resourceStatuses = updatedProject.resources.associate { resource -> resource.id to ResourceOpStatus.IDLE },
                 allSelected = computeAllSelected(updatedProject, selected),
                 runningStatus = emptyMap(),
                 availableTypes = computeAvailableTypes(updatedProject),
@@ -245,12 +253,8 @@ class InfrastructureViewModel(
         endpoint: String,
         logStrings: InfraLogStrings,
     ) {
-        val registry = resources.associateBy { it.tfLabel }
-        val appliedLabels = resources.map { it.tfLabel }.toSet()
-        val relevantSubscriptions =
-            subscriptions.filter { sub ->
-                sub.endpointRef.split(".").getOrNull(1) in appliedLabels
-            }
+        val registry = resources.associateBy { it.id }
+        val relevantSubscriptions = subscriptions.filter { sub -> referencedResourceId(sub.endpointRef) in registry }
 
         _state.update { state ->
             state.copy(
@@ -258,18 +262,19 @@ class InfrastructureViewModel(
                 logLines = emptyList(),
                 resourceStatuses =
                     state.resourceStatuses +
-                        resources.associate { resource -> resource.tfLabel to ResourceOpStatus.PENDING } +
-                        relevantSubscriptions.associate { sub -> sub.tfLabel to ResourceOpStatus.PENDING },
+                        resources.associate { resource -> resource.id to ResourceOpStatus.PENDING } +
+                        relevantSubscriptions.associate { sub -> sub.resourceId to ResourceOpStatus.PENDING },
             )
         }
 
-        val ctx = ApplyContext(ProcessRunner.awsEnvVars(endpoint), logStrings)
+        val ctx = ApplyContext(endpoint, ProcessRunner.awsEnvVars(endpoint), logStrings)
         for (resource in resources) {
             applyResourceCommand(resource, ctx)
         }
         for (sub in relevantSubscriptions) {
             applySubscription(sub, registry, ctx)
         }
+        hostProxySupervisor.requestReconcile()
 
         _state.update { it.copy(isRunning = false) }
     }
@@ -278,34 +283,75 @@ class InfrastructureViewModel(
         resource: TerraformResource,
         ctx: ApplyContext,
     ) {
-        val typeName = resource.resourceType?.id ?: resource.rawAwsType
+        val typeName = resource.resourceType?.displayName ?: resource.rawAwsType
         appendLog(ProcessLine(ctx.logStrings.creatingFmt.replace("{name}", resource.awsName).replace("{type}", typeName), false))
+        when (resource.resourceType) {
+            MskTopicResource -> return applyWithProvisioner(resource, ctx) { provisionMskTopic(resource, ctx) }
+            GlueSchemaResource -> return applyWithProvisioner(resource, ctx) { provisionGlueSchema(resource, ctx) }
+            else -> Unit
+        }
         val command = resource.resourceType?.createCommand(resource.awsName, resource.extraProperties)
         if (command == null) {
             appendLog(ProcessLine(ctx.logStrings.unsupportedFmt.replace("{type}", typeName), true))
-            setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)
+            setResourceStatus(resource.id, ResourceOpStatus.ERROR)
             return
         }
 
-        setResourceStatus(resource.tfLabel, ResourceOpStatus.PENDING)
+        setResourceStatus(resource.id, ResourceOpStatus.PENDING)
 
-        ProcessRunner.run(command, ProcessConfig(envVars = ctx.env)).fold(
+        val config = ProcessConfig(envVars = ctx.env, timeoutSeconds = resource.resourceType.createTimeoutSeconds)
+        ProcessRunner.run(command, config).fold(
             onSuccess = { output ->
                 output.stdout.lines().filter { it.isNotBlank() }.forEach { line -> appendLog(ProcessLine(line, false)) }
                 val succeeded = output.exitCode == 0 || output.exitCode == EXIT_CODE_ALREADY_EXISTS
                 if (succeeded) {
-                    setResourceStatus(resource.tfLabel, ResourceOpStatus.SUCCESS)
+                    setResourceStatus(resource.id, ResourceOpStatus.SUCCESS)
                     appendLog(ProcessLine(ctx.logStrings.createdFmt.replace("{name}", resource.awsName), false))
                 } else {
-                    setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)
+                    setResourceStatus(resource.id, ResourceOpStatus.ERROR)
                     appendLog(ProcessLine(ctx.logStrings.createErrorFmt.replace("{name}", resource.awsName), true))
                 }
             },
             onFailure = {
-                setResourceStatus(resource.tfLabel, ResourceOpStatus.ERROR)
+                setResourceStatus(resource.id, ResourceOpStatus.ERROR)
                 appendLog(ProcessLine(ctx.logStrings.createErrorFmt.replace("{name}", resource.awsName), true))
             },
         )
+    }
+
+    private suspend fun provisionMskTopic(
+        resource: TerraformResource,
+        ctx: ApplyContext,
+    ): Result<Unit> {
+        val cluster = resource.extraProperties[MskTopicResource.CLUSTER_PROPERTY] ?: MskTopicResource.clusterOf(resource.awsName)
+        val partitions =
+            resource.extraProperties[MskTopicResource.PARTITIONS_PROPERTY]?.toIntOrNull() ?: MskTopicResource.DEFAULT_PARTITIONS
+        appendLog(ProcessLine(ctx.logStrings.waitingClusterFmt.replace("{cluster}", cluster), false))
+        return mskTopicProvisioner.createTopic(ctx.endpoint, cluster, MskTopicResource.topicOf(resource.awsName), partitions)
+    }
+
+    private suspend fun provisionGlueSchema(
+        resource: TerraformResource,
+        ctx: ApplyContext,
+    ): Result<Unit> =
+        glueSchemaProvisioner.apply(ctx.endpoint, GlueSchemaResource.definitionFrom(resource.awsName, resource.extraProperties))
+
+    private suspend fun applyWithProvisioner(
+        resource: TerraformResource,
+        ctx: ApplyContext,
+        provision: suspend () -> Result<Unit>,
+    ) {
+        setResourceStatus(resource.id, ResourceOpStatus.PENDING)
+        provision()
+            .onSuccess {
+                setResourceStatus(resource.id, ResourceOpStatus.SUCCESS)
+                appendLog(ProcessLine(ctx.logStrings.createdFmt.replace("{name}", resource.awsName), false))
+            }
+            .onFailure { failure ->
+                setResourceStatus(resource.id, ResourceOpStatus.ERROR)
+                failure.message?.let { appendLog(ProcessLine(it, true)) }
+                appendLog(ProcessLine(ctx.logStrings.createErrorFmt.replace("{name}", resource.awsName), true))
+            }
     }
 
     private suspend fun applySubscription(
@@ -314,7 +360,7 @@ class InfrastructureViewModel(
         ctx: ApplyContext,
     ) {
         appendLog(ProcessLine(ctx.logStrings.subscribingFmt.replace("{label}", sub.tfLabel), false))
-        setResourceStatus(sub.tfLabel, ResourceOpStatus.PENDING)
+        setResourceStatus(sub.resourceId, ResourceOpStatus.PENDING)
 
         val topicArn = resolveArn(sub.topicRef, registry)
         val endpointArn = resolveArn(sub.endpointRef, registry)
@@ -325,13 +371,13 @@ class InfrastructureViewModel(
                 ProcessConfig(envVars = ctx.env),
             ).getOrElse {
                 appendLog(ProcessLine(ctx.logStrings.subscribeErrorFmt.replace("{label}", sub.tfLabel), true))
-                setResourceStatus(sub.tfLabel, ResourceOpStatus.ERROR)
+                setResourceStatus(sub.resourceId, ResourceOpStatus.ERROR)
                 return
             }
 
         if (output.exitCode != 0) {
             appendLog(ProcessLine(ctx.logStrings.subscribeErrorFmt.replace("{label}", sub.tfLabel), true))
-            setResourceStatus(sub.tfLabel, ResourceOpStatus.ERROR)
+            setResourceStatus(sub.resourceId, ResourceOpStatus.ERROR)
             return
         }
 
@@ -348,7 +394,7 @@ class InfrastructureViewModel(
         }
 
         appendLog(ProcessLine(ctx.logStrings.subscribedFmt.replace("{label}", sub.tfLabel), false))
-        setResourceStatus(sub.tfLabel, ResourceOpStatus.SUCCESS)
+        setResourceStatus(sub.resourceId, ResourceOpStatus.SUCCESS)
     }
 
     private suspend fun applyFilterPolicy(
@@ -383,19 +429,21 @@ class InfrastructureViewModel(
         return if (parts.size < 2) {
             ref
         } else {
-            val name = registry[parts[1]]?.awsName ?: parts[1]
+            val name = registry[referencedResourceId(ref)]?.awsName ?: parts[1]
             ResourceRegistry.fromTerraformPrefix(parts[0])?.buildArn(name) ?: ref
         }
     }
+
+    private fun referencedResourceId(reference: String): String = reference.split(".").take(2).joinToString(".")
 
     private fun appendLog(line: ProcessLine) {
         _state.update { it.copy(logLines = it.logLines + line) }
     }
 
     private fun setResourceStatus(
-        tfLabel: String,
+        resourceId: String,
         status: ResourceOpStatus,
     ) {
-        _state.update { it.copy(resourceStatuses = it.resourceStatuses + (tfLabel to status)) }
+        _state.update { it.copy(resourceStatuses = it.resourceStatuses + (resourceId to status)) }
     }
 }

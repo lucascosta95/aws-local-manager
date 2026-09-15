@@ -17,7 +17,7 @@ internal fun DownConfirmationDialog(
     onDismiss: () -> Unit,
 ) {
     val strings = LocalStrings.current
-    val names = resources.joinToString("\n") { "  • ${it.name} (${it.type.id})" }
+    val names = resources.joinToString("\n") { "  • ${it.name} (${it.type.displayName})" }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(strings.runningConfirmDown) },

@@ -25,16 +25,16 @@ O AWS Local Manager oferece uma interface visual integrada aos seus projetos Ter
 
 - 🩺 **Dashboard de saúde em tempo real** — monitore todos os serviços AWS emulados com intervalo de polling configurável
 - 🏗️ **Infraestrutura via Terraform** — leia seus arquivos `.tf` e provisione recursos diretamente no emulador sem precisar rodar `terraform apply`
-- ⚡ **Criação rápida** — crie filas SQS, tópicos SNS, buckets S3, tabelas DynamoDB e parâmetros SSM sem Terraform
-- 📤 **Publicação de mensagens** — envie mensagens JSON para SQS, SNS, DynamoDB e Step Functions; faça upload de arquivos para o S3
+- ⚡ **Criação rápida** — crie filas SQS, tópicos SNS, buckets S3, tabelas DynamoDB, parâmetros SSM, clusters e tópicos MSK, e registries e schemas do Glue sem Terraform
+- 📤 **Publicação de mensagens** — envie mensagens JSON para SQS, SNS, DynamoDB, Step Functions e tópicos Kafka (MSK); faça upload de arquivos para o S3
 - 🔁 **Execução de Step Functions** — dispare execuções de máquinas de estado com input JSON personalizado
 - 💾 **Payloads salvos** — armazene e reutilize mensagens comuns por projeto via `payloads.json`
 - 🌍 **i18n** — interface disponível em inglês e português (pt-BR)
 - 🎨 **Tema claro e escuro**
-- 🔍 **Inspector** — navegue e inspecione o conteúdo de filas SQS, execuções de Step Functions, tabelas DynamoDB, buckets S3, chaves ElastiCache e parâmetros SSM diretamente pelo app
+- 🔍 **Inspector** — navegue e inspecione o conteúdo de filas SQS, execuções de Step Functions, tabelas DynamoDB, buckets S3, chaves ElastiCache, parâmetros SSM, tópicos, mensagens, consumer groups e schemas do MSK, e schemas e versões do Glue Schema Registry diretamente pelo app
 - 🔄 **Auto-update** via GitHub Releases
 
-**Serviços suportados:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache · SSM Parameter Store
+**Serviços suportados:** SQS · SNS · S3 · DynamoDB · Step Functions · ElastiCache · SSM Parameter Store · MSK (Kafka) · Glue Schema Registry
 
 ---
 
@@ -67,6 +67,13 @@ servindo ela ao container já criado a partir dela, então um `docker pull` sozi
 Corrigir a verificação da imagem baixa a versão suportada, remove o container que o app criou com a
 imagem antiga, e apaga a imagem antiga. Corrigir a verificação do emulador recria o container na
 versão suportada. Tudo que for removido aparece no log da correção.
+
+O container do emulador também precisa rodar na rede Docker `aws-local-manager`, com
+`FLOCI_SERVICES_DOCKER_NETWORK` e `FLOCI_SERVICES_MSK_DEFAULT_IMAGE` definidas, para que os brokers Kafka
+que ele sobe consigam resolver o próprio nome. Um container criado por uma release anterior não tem
+isso, e o Setup também mostra o emulador como **Desatualizado** por esse motivo. A correção cria a rede
+quando ela não existe e recria o container. O emulador não guarda estado, então recriá-lo apaga todos os
+recursos criados até ali.
 
 ---
 
@@ -139,7 +146,7 @@ Identifica o projeto dentro do app. Apenas `name` é obrigatório:
 
 ```json
 {
-  "name": "Nimbus API"
+  "name": "Orders API"
 }
 ```
 
@@ -212,7 +219,7 @@ Como o parser lê um arquivo:
 
 - Apenas arquivos `.tf` **diretamente** dentro de `infra/` são lidos; subdiretórios são ignorados.
 - Todo recurso precisa ser um bloco de primeiro nível: `resource "<tipo_aws>" "<label>" { ... }`. O label aceita apenas letras, números e `_`.
-- O nome do recurso na AWS vem do atributo `name` do bloco. Quando ele não existe, o app usa o label com `_` trocado por `-`. A exceção é `aws_ssm_parameter`, que é ignorado quando o `name` está ausente.
+- O nome do recurso na AWS vem do atributo `name` do bloco. Quando ele não existe, o app usa o label com `_` trocado por `-`. As exceções são `aws_ssm_parameter` e `aws_msk_topic`, ignorados quando o `name` está ausente, e `aws_msk_cluster`, que lê `cluster_name`.
 - Os valores precisam ser strings literais. `var.*`, `local.*` e interpolações `${...}` **não** são resolvidos.
 - Qualquer outro atributo é ignorado pelo app e pode continuar no arquivo, então o mesmo `.tf` segue válido para um Terraform de verdade.
 
@@ -221,16 +228,16 @@ Como o parser lê um arquivo:
 #### SQS
 
 ```hcl
-resource "aws_sqs_queue" "nimbus_queue" {
-  name = "nimbus-queue"
+resource "aws_sqs_queue" "orders_events" {
+  name = "orders-events"
 }
 ```
 
 Atributos de tempo e retry são aceitos e ficam no arquivo para execuções reais do Terraform, mas o app cria a fila com os valores padrão do emulador:
 
 ```hcl
-resource "aws_sqs_queue" "nimbus_queue" {
-  name                       = "nimbus-queue"
+resource "aws_sqs_queue" "orders_events" {
+  name                       = "orders-events"
   visibility_timeout_seconds = 30
   message_retention_seconds  = 345600
   delay_seconds              = 0
@@ -241,15 +248,15 @@ resource "aws_sqs_queue" "nimbus_queue" {
 Uma dead-letter queue é apenas uma segunda fila. O app cria as duas, mas a política de redrive em si não é aplicada no emulador — use a **Criação rápida** quando precisar da fila já ligada a uma DLQ:
 
 ```hcl
-resource "aws_sqs_queue" "nimbus_queue_dlq" {
-  name = "nimbus-queue-dlq"
+resource "aws_sqs_queue" "orders_events_dlq" {
+  name = "orders-events-dlq"
 }
 
-resource "aws_sqs_queue" "nimbus_queue" {
-  name = "nimbus-queue"
+resource "aws_sqs_queue" "orders_events" {
+  name = "orders-events"
 
   redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.nimbus_queue_dlq.arn
+    deadLetterTargetArn = aws_sqs_queue.orders_events_dlq.arn
     maxReceiveCount     = 3
   })
 }
@@ -258,8 +265,8 @@ resource "aws_sqs_queue" "nimbus_queue" {
 #### SNS
 
 ```hcl
-resource "aws_sns_topic" "nimbus_topic" {
-  name = "nimbus-topic"
+resource "aws_sns_topic" "orders_status" {
+  name = "orders-status"
 }
 ```
 
@@ -268,10 +275,10 @@ resource "aws_sns_topic" "nimbus_topic" {
 `topic_arn` e `endpoint` podem referenciar outro recurso declarado na mesma pasta (`aws_sns_topic.<label>.arn`, `aws_sqs_queue.<label>.arn`) ou conter um ARN literal. A inscrição só é aplicada quando o recurso de endpoint está entre os recursos selecionados:
 
 ```hcl
-resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
-  topic_arn            = aws_sns_topic.nimbus_topic.arn
+resource "aws_sns_topic_subscription" "orders_status_to_events" {
+  topic_arn            = aws_sns_topic.orders_status.arn
   protocol             = "sqs"
-  endpoint             = aws_sqs_queue.nimbus_queue.arn
+  endpoint             = aws_sqs_queue.orders_events.arn
   raw_message_delivery = true
 }
 ```
@@ -279,10 +286,10 @@ resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
 `filter_policy` é suportado via `jsonencode`, com um atributo por linha e um valor JSON válido em cada uma delas (objetos aninhados não são interpretados):
 
 ```hcl
-resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
-  topic_arn = aws_sns_topic.nimbus_topic.arn
+resource "aws_sns_topic_subscription" "orders_status_to_events" {
+  topic_arn = aws_sns_topic.orders_status.arn
   protocol  = "sqs"
-  endpoint  = aws_sqs_queue.nimbus_queue.arn
+  endpoint  = aws_sqs_queue.orders_events.arn
 
   filter_policy       = jsonencode({
     eventType = ["created", "updated"]
@@ -297,8 +304,8 @@ resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
 O parser procura por `name`, atributo que um bloco `aws_s3_bucket` não tem, então o nome do bucket vem do label com `_` trocado por `-`. Mantenha o label e o valor de `bucket` alinhados:
 
 ```hcl
-resource "aws_s3_bucket" "nimbus_bucket" {
-  bucket = "nimbus-bucket"
+resource "aws_s3_bucket" "orders_invoices" {
+  bucket = "orders-invoices"
 }
 ```
 
@@ -307,8 +314,8 @@ resource "aws_s3_bucket" "nimbus_bucket" {
 A tabela é sempre criada com uma única chave de partição `id` do tipo `S` e cobrança `PAY_PER_REQUEST`, independentemente das chaves declaradas no arquivo:
 
 ```hcl
-resource "aws_dynamodb_table" "nimbus_table" {
-  name         = "nimbus-table"
+resource "aws_dynamodb_table" "orders_table" {
+  name         = "orders-table"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id"
 
@@ -324,12 +331,12 @@ resource "aws_dynamodb_table" "nimbus_table" {
 Apenas `name` é usado. A máquina de estado é criada no emulador com um único estado de passagem, então a `definition` abaixo serve para execuções reais do Terraform e como documentação:
 
 ```hcl
-resource "aws_sfn_state_machine" "nimbus_flow" {
-  name     = "nimbus-flow"
+resource "aws_sfn_state_machine" "orders_flow" {
+  name     = "orders-flow"
   role_arn = "arn:aws:iam::000000000000:role/stepfunctions-role"
 
   definition = jsonencode({
-    Comment = "nimbus-flow",
+    Comment = "orders-flow",
     StartAt = "HelloWorld",
     States  = {
       HelloWorld = { Type = "Pass", End = true }
@@ -343,8 +350,8 @@ resource "aws_sfn_state_machine" "nimbus_flow" {
 O nome vem de `cluster_id`. Com `engine = "redis"` o app cria um replication group; com `engine = "memcached"` ele cria um cache cluster usando `num_cache_nodes`:
 
 ```hcl
-resource "aws_elasticache_cluster" "nimbus_cache" {
-  cluster_id      = "nimbus-cache"
+resource "aws_elasticache_cluster" "orders_cache" {
+  cluster_id      = "orders-cache"
   engine          = "redis"
   node_type       = "cache.t3.micro"
   num_cache_nodes = 1
@@ -359,8 +366,8 @@ O parser só lê valores entre aspas, então um `num_cache_nodes = 1` sem aspas 
 O `name` é obrigatório neste tipo. Um label de bloco Terraform não aceita barra, então o fallback normal para o label inventaria um nome de parâmetro errado — um bloco sem `name` é ignorado pelo app.
 
 ```hcl
-resource "aws_ssm_parameter" "nimbus_db_host" {
-  name  = "/nimbus/db/host"
+resource "aws_ssm_parameter" "orders_db_host" {
+  name  = "/orders/db/host"
   type  = "String"
   value = "localhost"
 }
@@ -369,6 +376,110 @@ resource "aws_ssm_parameter" "nimbus_db_host" {
 O app envia `name`, `value` e `type` ao emulador com `put-parameter --overwrite`, então criar um parâmetro que já existe substitui o valor e incrementa a versão. Um `value` ausente é enviado como string vazia e um `type` ausente cai no padrão `String`.
 
 > ⚠️ Um valor `SecureString` escrito em um arquivo `.tf` é um segredo em texto puro no seu repositório, e o Inspector o exibe descriptografado. Para depuração local, prefira `String`.
+
+#### Amazon MSK (Kafka)
+
+O emulador sustenta cada cluster MSK com um container [Redpanda](https://redpanda.com), que fala o protocolo Kafka. Um tópico aponta para o cluster pelo `cluster_arn`, seja como referência a um `aws_msk_cluster` declarado em qualquer arquivo da pasta, seja como ARN literal:
+
+```hcl
+resource "aws_msk_cluster" "orders" {
+  cluster_name           = "orders-kafka"
+  kafka_version          = "3.6.0"
+  number_of_broker_nodes = 1
+
+  broker_node_group_info {
+    instance_type  = "kafka.t3.small"
+    client_subnets = ["subnet-local"]
+  }
+}
+
+resource "aws_msk_topic" "order_created" {
+  name               = "order-created"
+  cluster_arn        = aws_msk_cluster.orders.arn
+  partition_count    = 3
+  replication_factor = 1
+}
+```
+
+- O cluster é criado com `kafka_version`, `number_of_broker_nodes` e `instance_type`. Subnets, security groups, criptografia, autenticação, logs e monitoramento são ignorados, então referências como `aws_subnet.a.id` não atrapalham.
+- Seja qual for o `number_of_broker_nodes`, o emulador roda **um** broker. Por isso os tópicos são criados com replication factor `1`, e `configs` não é aplicado.
+- Um tópico cujo `cluster_arn` aponta para um cluster que não está na pasta é ignorado.
+- O primeiro cluster baixa a imagem do broker (cerca de 125 MB), então pode levar um minuto. Os tópicos são criados assim que o cluster fica ativo.
+- Os tópicos aparecem na tela de Recursos em Execução como `<cluster>/<tópico>`. Esse também é o nome para usar no `payloads.json`, onde só o nome do tópico também funciona.
+
+**Conectando sua aplicação.** O broker se anuncia como `floci-msk-<id>:9092`, um nome que só resolve dentro da rede Docker `aws-local-manager`, então um cliente fora dessa rede não consegue segui-lo. O app contorna isso subindo um container de proxy (`grepplabs/kafka-proxy`) para cada cluster ativo, que reescreve esse endereço para uma porta em `localhost`. O Inspector mostra os dois endereços, com botão de copiar:
+
+| Onde a aplicação roda | `bootstrap.servers` |
+|---|---|
+| Na sua máquina, por exemplo iniciada pela IDE | `localhost:19092` — os próximos clusters recebem `19093`, `19094`, … |
+| Em um container na rede `aws-local-manager` | `floci-msk-<id>:9092` |
+
+- O proxy sobe em até um intervalo de polling depois que o cluster fica ativo, e o primeiro baixa a imagem do proxy (cerca de 300 MB). Ele é removido quando o cluster é apagado ou o emulador para.
+- As portas são distribuídas em ordem alfabética do nome do cluster, e um cluster recriado mantém a porta enquanto o app está aberto. Com um único cluster, o endereço é sempre `localhost:19092`.
+- Os proxies continuam rodando depois que o app é fechado, então um serviço iniciado pela IDE segue conectado. Na próxima vez que o app abrir, ele remove os proxies cujo cluster não existe mais.
+- As portas são publicadas apenas em `127.0.0.1`.
+
+Para uma aplicação em container, entre na rede pelo Compose:
+
+```yaml
+services:
+  orders-service:
+    build: .
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: floci-msk-a1b2c3:9092
+    networks:
+      - aws-local-manager
+
+networks:
+  aws-local-manager:
+    external: true
+```
+
+**Schema Registry (compatível com Confluent).** Cada cluster MSK também roda um schema registry que fala a API do Confluent Schema Registry, então `io.confluent:kafka-avro-serializer` e afins funcionam sem mudança. O app o expõe do mesmo jeito que o broker:
+
+| Onde a aplicação roda | `schema.registry.url` |
+|---|---|
+| Na sua máquina, por exemplo iniciada pela IDE | `http://localhost:18081` — os próximos clusters recebem `18082`, `18083`, … |
+| Em um container na rede `aws-local-manager` | `http://floci-msk-<id>:8081` |
+
+Os schemas são registrados pela própria aplicação (`auto.register.schemas`) ou pela API REST do registry; não existe recurso Terraform para eles. O Inspector lista cada subject com a última versão, e copiar uma linha copia o schema. Se a sua aplicação usa o AWS Glue Schema Registry, veja a próxima seção.
+
+> ⚠️ Nada sobrevive a um restart do emulador. Clusters, tópicos, schemas e mensagens precisam ser aplicados de novo.
+
+#### Glue Schema Registry
+
+Para aplicações que serializam mensagens Kafka com a SerDe do AWS Glue Schema Registry (`software.amazon.glue:schema-registry-serde`). Um schema aponta para o registry pelo `registry_arn`, seja como referência a um `aws_glue_registry` em qualquer arquivo da pasta, seja como ARN literal; sem `registry_arn` ele vai para o `default-registry`, como na AWS.
+
+```hcl
+resource "aws_glue_registry" "payments" {
+  registry_name = "payments"
+}
+
+resource "aws_glue_schema" "payment_approved" {
+  schema_name       = "payment-approved"
+  registry_arn      = aws_glue_registry.payments.arn
+  data_format       = "AVRO"
+  compatibility     = "BACKWARD"
+  schema_definition = file("${path.module}/schemas/payment-approved.avsc")
+}
+```
+
+- `schema_name`, `data_format` (`AVRO`, `JSON` ou `PROTOBUF`) e `schema_definition` são obrigatórios; um bloco sem algum deles é ignorado. `compatibility` tem `BACKWARD` como padrão.
+- `schema_definition` pode ser uma string entre aspas, um heredoc (`<<EOF` ou `<<-EOF`) ou `file("...")` com caminho relativo a `infra/`, com ou sem o prefixo `${path.module}/`. `jsonencode(...)` **não** é avaliado.
+- Aplicar de novo é seguro: uma definição sem mudança mantém a versão, e uma definição editada vira uma nova versão, respeitando o modo de compatibilidade.
+- O Inspector lista registries e schemas, e mostra todas as versões de um schema com a definição.
+
+O registry fica atrás do endpoint da AWS, então a aplicação o acessa como acessa o SQS ou o S3 — sem proxy. Aponte a SerDe para o emulador no perfil local:
+
+```properties
+endpoint=http://localhost:4566
+region=us-east-1
+registry.name=payments
+dataFormat=AVRO
+schemaAutoRegistrationEnabled=false
+```
+
+junto com `AWS_ACCESS_KEY_ID=test` e `AWS_SECRET_ACCESS_KEY=test` no ambiente.
 
 #### O que o app lê de cada tipo
 
@@ -382,6 +493,10 @@ O app envia `name`, `value` e `type` ao emulador com `put-parameter --overwrite`
 | `aws_sfn_state_machine` | `name` | Máquina de estado com um único `Pass` |
 | `aws_elasticache_cluster` | `cluster_id`, `engine`, `node_type`, `num_cache_nodes` (entre aspas) | Replication group (redis) ou cache cluster (memcached) |
 | `aws_ssm_parameter` | `name` (obrigatório), `value`, `type` | Parâmetro criado com `put-parameter --overwrite` |
+| `aws_msk_cluster` | `cluster_name`, `kafka_version`, `number_of_broker_nodes`, `instance_type` | Cluster sustentado por um único broker Redpanda |
+| `aws_msk_topic` | `name` (obrigatório), `cluster_arn` (obrigatório), `partition_count` | Tópico com replication factor `1` |
+| `aws_glue_registry` | `registry_name` | Schema registry |
+| `aws_glue_schema` | `schema_name`, `data_format`, `schema_definition` (todos obrigatórios), `registry_arn`, `compatibility` | Schema, ou uma nova versão dele quando a definição mudou |
 
 ### payloads.json
 

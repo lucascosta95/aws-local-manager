@@ -122,16 +122,16 @@ fun InfrastructureScreen(
                                 items(visibleResources, key = { it.id }) { resource ->
                                     ResourceRow(
                                         resource = resource,
-                                        isSelected = resource.tfLabel in state.selectedResources,
-                                        status = state.resourceStatuses[resource.tfLabel] ?: ResourceOpStatus.IDLE,
+                                        isSelected = resource.id in state.selectedResources,
+                                        status = state.resourceStatuses[resource.id] ?: ResourceOpStatus.IDLE,
                                         runningStatus =
                                             if (state.hasRunOperation) {
                                                 ResourceRunningStatus.UNKNOWN
                                             } else {
-                                                state.runningStatus[resource.tfLabel]
+                                                state.runningStatus[resource.id]
                                                     ?: ResourceRunningStatus.UNKNOWN
                                             },
-                                        onToggle = { viewModel.toggleResource(resource.tfLabel) },
+                                        onToggle = { viewModel.toggleResource(resource.id) },
                                     )
                                 }
                             }
@@ -151,7 +151,7 @@ fun InfrastructureScreen(
                     val unsupportedSelectedCount by remember(state.selectedResources, state.project) {
                         derivedStateOf {
                             state.project?.resources?.count {
-                                it.tfLabel in state.selectedResources && !it.isSupported
+                                it.id in state.selectedResources && !it.isSupported
                             } ?: 0
                         }
                     }

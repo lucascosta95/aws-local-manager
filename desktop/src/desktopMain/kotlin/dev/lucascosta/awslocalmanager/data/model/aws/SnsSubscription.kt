@@ -8,4 +8,6 @@ data class SnsSubscription(
     val rawMessageDelivery: Boolean,
     val filterPolicy: String?,
     val filterPolicyScope: String?,
-)
+) {
+    val resourceId: String get() = "aws_sns_topic_subscription.$tfLabel"
+}

@@ -9,6 +9,11 @@ import dev.lucascosta.awslocalmanager.data.model.project.InfraProject
 import dev.lucascosta.awslocalmanager.data.model.project.ProjectConfig
 import dev.lucascosta.awslocalmanager.data.model.project.TerraformResource
 import dev.lucascosta.awslocalmanager.data.model.resources.ElastiCacheEngine
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueRegistryResource
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaDataFormat
+import dev.lucascosta.awslocalmanager.data.model.resources.GlueSchemaResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskClusterResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SsmParameterType
 import kotlinx.serialization.json.Json
@@ -24,6 +29,27 @@ class TerraformReader {
         private val snsSubscriptionPattern = Regex("""resource\s+"aws_sns_topic_subscription"\s+"(\w+)"\s*\{""")
         private val rawDeliveryPattern = Regex("""raw_message_delivery\s*=\s*true""")
         private val filterPolicyPattern = Regex("""filter_policy\s*=\s*jsonencode\s*\(\s*\{""")
+        private val parentLinks =
+            listOf(
+                ParentLink(
+                    childPrefix = MskTopicResource.terraformPrefix,
+                    parentPrefix = MskClusterResource.terraformPrefix,
+                    referenceProperty = MskTopicResource.CLUSTER_REFERENCE_PROPERTY,
+                    parentProperty = MskTopicResource.CLUSTER_PROPERTY,
+                    arnPattern = Regex("""^arn:aws:kafka:[^:]*:[^:]*:cluster/([^/]+)/"""),
+                    defaultParent = null,
+                    qualify = MskTopicResource::qualifiedName,
+                ),
+                ParentLink(
+                    childPrefix = GlueSchemaResource.terraformPrefix,
+                    parentPrefix = GlueRegistryResource.terraformPrefix,
+                    referenceProperty = GlueSchemaResource.REGISTRY_REFERENCE_PROPERTY,
+                    parentProperty = GlueSchemaResource.REGISTRY_PROPERTY,
+                    arnPattern = Regex("""^arn:aws:glue:[^:]*:[^:]*:registry/([^/]+)$"""),
+                    defaultParent = GlueRegistryResource.DEFAULT_REGISTRY,
+                    qualify = GlueSchemaResource::qualifiedName,
+                ),
+            )
     }
 
     fun findProjects(rootDir: File): List<InfraProject> {
@@ -48,7 +74,7 @@ class TerraformReader {
             return emptyList()
         }
 
-        return tfFiles.flatMap { parseResourcesFromFile(it) }.sortedBy { it.tfLabel }
+        return resolveParents(tfFiles.flatMap { parseResourcesFromFile(it) }).sortedBy { it.tfLabel }
     }
 
     private fun parseProjectDirectory(dir: File): InfraProject? {
@@ -77,7 +103,7 @@ class TerraformReader {
             val awsPrefix = match.groupValues[1]
             val tfLabel = match.groupValues[2]
             val blockContent = extractBlock(content, match.range.last + 1)
-            val (awsName, extraProperties) = parseAttributes(awsPrefix, tfLabel, blockContent) ?: return@mapNotNull null
+            val (awsName, extraProperties) = parseAttributes(awsPrefix, tfLabel, blockContent, file.parentFile) ?: return@mapNotNull null
             TerraformResource(
                 tfLabel = tfLabel,
                 awsName = awsName,
@@ -93,10 +119,15 @@ class TerraformReader {
         awsPrefix: String,
         tfLabel: String,
         blockContent: String,
+        baseDir: File,
     ): Pair<String, Map<String, String>>? =
         when (awsPrefix) {
             "aws_elasticache_cluster" -> parseElastiCacheAttributes(tfLabel, blockContent)
             "aws_ssm_parameter" -> parseSsmParameterAttributes(blockContent)
+            "aws_msk_cluster" -> parseMskClusterAttributes(tfLabel, blockContent)
+            "aws_msk_topic" -> parseMskTopicAttributes(blockContent)
+            "aws_glue_registry" -> parseGlueRegistryAttributes(tfLabel, blockContent)
+            "aws_glue_schema" -> parseGlueSchemaAttributes(blockContent, baseDir)
             else -> (namePattern.find(blockContent)?.groupValues?.get(1) ?: tfLabel.replace("_", "-")) to emptyMap()
         }
 
@@ -131,6 +162,110 @@ class TerraformReader {
                 SsmParameterResource.TYPE_PROPERTY to type,
             )
     }
+
+    private fun parseMskClusterAttributes(
+        tfLabel: String,
+        blockContent: String,
+    ): Pair<String, Map<String, String>> {
+        val clusterName = extractQuotedAttribute(blockContent, "cluster_name") ?: tfLabel.replace("_", "-")
+        val kafkaVersion = MskClusterResource.KAFKA_VERSION_PROPERTY
+        val brokerNodes = MskClusterResource.BROKER_NODES_PROPERTY
+        val instanceType = MskClusterResource.INSTANCE_TYPE_PROPERTY
+        return clusterName to
+            mapOf(
+                kafkaVersion to (extractQuotedAttribute(blockContent, kafkaVersion) ?: MskClusterResource.DEFAULT_KAFKA_VERSION),
+                brokerNodes to (extractNumericAttribute(blockContent, brokerNodes) ?: MskClusterResource.DEFAULT_BROKER_NODES),
+                instanceType to (extractQuotedAttribute(blockContent, instanceType) ?: MskClusterResource.DEFAULT_INSTANCE_TYPE),
+            )
+    }
+
+    private fun parseMskTopicAttributes(blockContent: String): Pair<String, Map<String, String>>? {
+        val topicName = namePattern.find(blockContent)?.groupValues?.get(1) ?: return null
+        val clusterReference = extractAttributeValue(blockContent, MskTopicResource.CLUSTER_REFERENCE_PROPERTY) ?: return null
+        val partitions =
+            extractNumericAttribute(blockContent, MskTopicResource.PARTITIONS_PROPERTY)
+                ?: MskTopicResource.DEFAULT_PARTITIONS.toString()
+        return topicName to
+            mapOf(
+                MskTopicResource.CLUSTER_REFERENCE_PROPERTY to clusterReference,
+                MskTopicResource.PARTITIONS_PROPERTY to partitions,
+            )
+    }
+
+    private fun parseGlueRegistryAttributes(
+        tfLabel: String,
+        blockContent: String,
+    ): Pair<String, Map<String, String>> =
+        (extractQuotedAttribute(blockContent, "registry_name") ?: tfLabel.replace("_", "-")) to emptyMap()
+
+    private fun parseGlueSchemaAttributes(
+        blockContent: String,
+        baseDir: File,
+    ): Pair<String, Map<String, String>>? {
+        val schemaName = extractQuotedAttribute(blockContent, "schema_name") ?: return null
+        val definition = HclStringReader.read(blockContent, GlueSchemaResource.DEFINITION_PROPERTY, baseDir) ?: return null
+        val dataFormat =
+            extractQuotedAttribute(blockContent, GlueSchemaResource.DATA_FORMAT_PROPERTY)
+                ?.let { GlueSchemaDataFormat.fromCliValue(it) } ?: return null
+        val properties =
+            buildMap {
+                put(GlueSchemaResource.DEFINITION_PROPERTY, definition)
+                put(GlueSchemaResource.DATA_FORMAT_PROPERTY, dataFormat.name)
+                extractQuotedAttribute(blockContent, GlueSchemaResource.COMPATIBILITY_PROPERTY)
+                    ?.let { put(GlueSchemaResource.COMPATIBILITY_PROPERTY, it) }
+                extractAttributeValue(blockContent, GlueSchemaResource.REGISTRY_REFERENCE_PROPERTY)
+                    ?.let { put(GlueSchemaResource.REGISTRY_REFERENCE_PROPERTY, it) }
+            }
+        return schemaName to properties
+    }
+
+    // Topics and schemas point at their parent by Terraform reference, possibly across files, so parents are resolved last.
+    private fun resolveParents(resources: List<TerraformResource>): List<TerraformResource> =
+        parentLinks.fold(resources) { current, link -> resolveParent(current, link) }
+
+    private fun resolveParent(
+        resources: List<TerraformResource>,
+        link: ParentLink,
+    ): List<TerraformResource> {
+        val parentNamesByLabel =
+            resources
+                .filter { it.rawAwsType == link.parentPrefix }
+                .associate { it.tfLabel to it.awsName }
+
+        return resources.mapNotNull { resource ->
+            if (resource.rawAwsType != link.childPrefix) return@mapNotNull resource
+            val reference = resource.extraProperties[link.referenceProperty]
+            val parentName =
+                when (reference) {
+                    null -> link.defaultParent
+                    else -> resolveParentName(reference, link, parentNamesByLabel)
+                } ?: return@mapNotNull null
+            resource.copy(
+                awsName = link.qualify(parentName, resource.awsName),
+                extraProperties = resource.extraProperties + (link.parentProperty to parentName),
+            )
+        }
+    }
+
+    private fun resolveParentName(
+        reference: String,
+        link: ParentLink,
+        parentNamesByLabel: Map<String, String>,
+    ): String? {
+        val label = Regex("""^${link.parentPrefix}\.(\w+)\.arn$""").find(reference)?.groupValues?.get(1)
+        if (label != null) return parentNamesByLabel[label]
+        return link.arnPattern.find(reference)?.groupValues?.get(1)
+    }
+
+    private data class ParentLink(
+        val childPrefix: String,
+        val parentPrefix: String,
+        val referenceProperty: String,
+        val parentProperty: String,
+        val arnPattern: Regex,
+        val defaultParent: String?,
+        val qualify: (parent: String, child: String) -> String,
+    )
 
     private fun extractBlock(
         content: String,
@@ -209,6 +344,13 @@ class TerraformReader {
         key: String,
     ): String? =
         Regex("""^\s*${Regex.escape(key)}\s*=\s*"([^"]+)"""", RegexOption.MULTILINE)
+            .find(blockContent)?.groupValues?.get(1)
+
+    private fun extractNumericAttribute(
+        blockContent: String,
+        key: String,
+    ): String? =
+        Regex("""^\s*${Regex.escape(key)}\s*=\s*"?(\d+)"?\s*$""", RegexOption.MULTILINE)
             .find(blockContent)?.groupValues?.get(1)
 
     private fun extractFilterPolicy(blockContent: String): String? {

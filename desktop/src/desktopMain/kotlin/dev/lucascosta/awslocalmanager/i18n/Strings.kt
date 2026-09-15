@@ -192,6 +192,7 @@ data class Strings(
     val infraLogSubscribeErrorFmt: String,
     val infraLogFilterWarningFmt: String,
     val infraLogFilterScopeWarningFmt: String,
+    val infraLogWaitingClusterFmt: String,
     val runningTitle: String,
     val runningSubtitle: String,
     val runningRefresh: String,

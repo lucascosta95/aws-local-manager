@@ -4,6 +4,7 @@ import dev.lucascosta.awslocalmanager.data.model.aws.AwsResourceDefinition
 import dev.lucascosta.awslocalmanager.data.model.aws.PublishResult
 import dev.lucascosta.awslocalmanager.data.model.aws.S3Upload
 import dev.lucascosta.awslocalmanager.data.model.resources.DynamoDbResource
+import dev.lucascosta.awslocalmanager.data.model.resources.MskTopicResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SnsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.SqsResource
 import dev.lucascosta.awslocalmanager.data.model.resources.StepFunctionsResource
@@ -12,6 +13,9 @@ import dev.lucascosta.awslocalmanager.data.remote.AwsS3Client
 import dev.lucascosta.awslocalmanager.data.remote.AwsSnsClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsSqsClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsStepFunctionsClient
+import dev.lucascosta.awslocalmanager.data.remote.KafkaBrokerClient
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 
 class MessageRepository(
     private val snsClient: AwsSnsClient,
@@ -19,6 +23,7 @@ class MessageRepository(
     private val s3Client: AwsS3Client,
     private val dynamoDbClient: AwsDynamoDbClient,
     private val stepFunctionsClient: AwsStepFunctionsClient,
+    private val kafkaBrokerClient: KafkaBrokerClient,
 ) {
     suspend fun publish(
         type: AwsResourceDefinition,
@@ -54,8 +59,31 @@ class MessageRepository(
                     PublishResult(success = false, error = e.message)
                 }
 
+            MskTopicResource ->
+                produceToTopic(resource, message).map { position ->
+                    PublishResult(success = true, messageId = position)
+                }.recoverCatching { e ->
+                    PublishResult(success = false, error = e.message)
+                }
+
             else -> null
         }
+
+    private suspend fun produceToTopic(
+        qualifiedTopic: String,
+        message: String,
+    ): Result<String> {
+        val cluster = MskTopicResource.clusterOf(qualifiedTopic)
+        val container =
+            kafkaBrokerClient.findBrokerContainer(cluster)
+                ?: return Result.failure(IllegalStateException("No broker container found for cluster $cluster"))
+        return kafkaBrokerClient.produce(container, MskTopicResource.topicOf(qualifiedTopic), toSingleLine(message))
+    }
+
+    // rpk splits its input into one record per line, so a pretty-printed payload must be collapsed first.
+    private fun toSingleLine(message: String): String =
+        runCatching { Json.encodeToString(JsonElement.serializer(), Json.parseToJsonElement(message)) }
+            .getOrElse { message.lines().joinToString(" ") }
 
     suspend fun uploadS3(
         bucket: String,

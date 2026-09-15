@@ -67,6 +67,8 @@ import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorDetail
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorResource
 import dev.lucascosta.awslocalmanager.data.model.inspector.SfnInspectorExecution
 import dev.lucascosta.awslocalmanager.data.model.inspector.SqsInspectorMessage
+import dev.lucascosta.awslocalmanager.features.inspector.handler.GlueSchemaRegistryInspectorHandler
+import dev.lucascosta.awslocalmanager.features.inspector.handler.MskInspectorHandler
 import dev.lucascosta.awslocalmanager.features.inspector.handler.SqsInspectorHandler
 import dev.lucascosta.awslocalmanager.i18n.InspectorStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
@@ -507,6 +509,22 @@ private fun DetailPanel(
 
                     is InspectorDetail.SsmDetail ->
                         SsmDetailView(detail = detail, modifier = Modifier.fillMaxSize())
+
+                    is InspectorDetail.GlueSchemaRegistryDetail ->
+                        GlueSchemaRegistryDetailView(
+                            detail = detail,
+                            isLoadingSubDetail = state.isLoadingSubDetail,
+                            onSelectItem = viewModel::selectDetailItem,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+
+                    is InspectorDetail.MskDetail ->
+                        MskDetailView(
+                            detail = detail,
+                            isLoadingSubDetail = state.isLoadingSubDetail,
+                            onSelectTopic = viewModel::selectDetailItem,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                 }
             }
 
@@ -1113,32 +1131,32 @@ private fun localizedSummary(
     resource: InspectorResource,
     strings: InspectorStrings,
 ): String =
-    when (resource.summaryType) {
-        "sqs" ->
-            resource.summaryCount
-                ?.let { pluralizedCount(it, strings.inspectorSummarySqsSingular, strings.inspectorSummarySqsPlural) }
-                ?: strings.inspectorSummarySqsUnknown
+    countedSummary(resource, strings)
+        ?: when (resource.summaryType) {
+            "sqs" -> strings.inspectorSummarySqsUnknown
+            "sfn" -> strings.inspectorSummarySfn
+            "s3" -> strings.inspectorSummaryS3
+            "redis", "memcached" -> strings.inspectorSummaryElastiCache
+            MskInspectorHandler.SUMMARY_TYPE -> strings.inspectorSummaryMsk
+            else -> ""
+        }
 
-        "dynamo" ->
-            pluralizedCount(
-                resource.summaryCount ?: 0L,
-                strings.inspectorSummaryDynamoSingular,
-                strings.inspectorSummaryDynamoPlural,
-            )
-
-        "sfn" -> strings.inspectorSummarySfn
-        "s3" -> strings.inspectorSummaryS3
-        "redis", "memcached" -> strings.inspectorSummaryElastiCache
-
-        "ssm" ->
-            pluralizedCount(
-                resource.summaryCount ?: 0L,
-                strings.inspectorSummarySsmSingular,
-                strings.inspectorSummarySsmPlural,
-            )
-
-        else -> ""
-    }
+private fun countedSummary(
+    resource: InspectorResource,
+    strings: InspectorStrings,
+): String? {
+    val (singular, plural) =
+        when (resource.summaryType) {
+            "sqs" -> strings.inspectorSummarySqsSingular to strings.inspectorSummarySqsPlural
+            "dynamo" -> strings.inspectorSummaryDynamoSingular to strings.inspectorSummaryDynamoPlural
+            "ssm" -> strings.inspectorSummarySsmSingular to strings.inspectorSummarySsmPlural
+            GlueSchemaRegistryInspectorHandler.SUMMARY_TYPE -> strings.inspectorSummaryGlueSingular to strings.inspectorSummaryGluePlural
+            else -> return null
+        }
+    val count = resource.summaryCount
+    if (count == null && resource.summaryType == "sqs") return null
+    return pluralizedCount(count ?: 0L, singular, plural)
+}
 
 private fun localizedSfnStatus(
     status: String,

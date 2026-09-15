@@ -8,7 +8,7 @@ import dev.lucascosta.awslocalmanager.data.remote.EmulatorDefaults
 
 object StepFunctionsResource : AwsResourceDefinition {
     override val id = "STEP_FUNCTIONS"
-    override val displayName = "STEP_FUNCTIONS"
+    override val displayName = "Step Functions"
     override val terraformPrefix = "aws_sfn_state_machine"
     override val healthKey = "states"
     override val creationPriority = 3

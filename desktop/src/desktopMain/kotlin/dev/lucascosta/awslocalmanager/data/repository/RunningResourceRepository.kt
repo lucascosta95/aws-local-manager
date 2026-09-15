@@ -30,6 +30,9 @@ class RunningResourceRepository(
     private val elastiCacheClientFactory: (String) -> AwsElastiCacheClient = ::AwsElastiCacheClient,
     private val ssmClientFactory: (String) -> AwsSsmClient = ::AwsSsmClient,
 ) {
+    private val mskRunningResources = MskRunningResources()
+    private val glueRunningResources = GlueRunningResources()
+
     suspend fun fetchAllRunningResources(
         endpoint: String,
         activeServices: Set<String>,
@@ -42,8 +45,10 @@ class RunningResourceRepository(
             val sfnJob = async { fetchStepFunctionsResources(endpoint, activeServices) }
             val elcJob = async { fetchElastiCacheResources(endpoint, activeServices) }
             val ssmJob = async { fetchSsmResources(endpoint, activeServices) }
+            val mskJob = async { mskRunningResources.fetch(endpoint, activeServices) }
+            val glueJob = async { glueRunningResources.fetch(endpoint, activeServices) }
 
-            sqsJob.await() + snsJob.await() + s3Job.await() + dynamoJob.await() + sfnJob.await() + elcJob.await() + ssmJob.await()
+            listOf(sqsJob, snsJob, s3Job, dynamoJob, sfnJob, elcJob, ssmJob, mskJob, glueJob).flatMap { it.await() }
         }
 
     suspend fun deleteResources(
@@ -53,7 +58,7 @@ class RunningResourceRepository(
         val env = ProcessRunner.awsEnvVars(endpoint)
         val results = mutableMapOf<RunningResource, Boolean>()
 
-        resources.forEach { resource ->
+        resources.sortedByDescending { it.type.creationPriority }.forEach { resource ->
             val cmd = resource.type.deleteCommand(resource)
 
             if (cmd == null) {
