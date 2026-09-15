@@ -145,7 +145,7 @@ Identifies the project inside the app. Only `name` is required:
 
 ```json
 {
-  "name": "Nimbus API"
+  "name": "Orders API"
 }
 ```
 
@@ -227,16 +227,16 @@ How the parser reads a file:
 #### SQS
 
 ```hcl
-resource "aws_sqs_queue" "nimbus_queue" {
-  name = "nimbus-queue"
+resource "aws_sqs_queue" "orders_events" {
+  name = "orders-events"
 }
 ```
 
 Timing and retry attributes are accepted and kept for real Terraform runs, but the app creates the queue with the emulator defaults:
 
 ```hcl
-resource "aws_sqs_queue" "nimbus_queue" {
-  name                       = "nimbus-queue"
+resource "aws_sqs_queue" "orders_events" {
+  name                       = "orders-events"
   visibility_timeout_seconds = 30
   message_retention_seconds  = 345600
   delay_seconds              = 0
@@ -247,15 +247,15 @@ resource "aws_sqs_queue" "nimbus_queue" {
 A dead-letter queue is just a second queue. The app creates both, but the redrive policy itself is not applied to the emulator — use **Quick Create** when you need the queue wired to a DLQ:
 
 ```hcl
-resource "aws_sqs_queue" "nimbus_queue_dlq" {
-  name = "nimbus-queue-dlq"
+resource "aws_sqs_queue" "orders_events_dlq" {
+  name = "orders-events-dlq"
 }
 
-resource "aws_sqs_queue" "nimbus_queue" {
-  name = "nimbus-queue"
+resource "aws_sqs_queue" "orders_events" {
+  name = "orders-events"
 
   redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.nimbus_queue_dlq.arn
+    deadLetterTargetArn = aws_sqs_queue.orders_events_dlq.arn
     maxReceiveCount     = 3
   })
 }
@@ -264,8 +264,8 @@ resource "aws_sqs_queue" "nimbus_queue" {
 #### SNS
 
 ```hcl
-resource "aws_sns_topic" "nimbus_topic" {
-  name = "nimbus-topic"
+resource "aws_sns_topic" "orders_status" {
+  name = "orders-status"
 }
 ```
 
@@ -274,10 +274,10 @@ resource "aws_sns_topic" "nimbus_topic" {
 `topic_arn` and `endpoint` may reference another resource declared in the same folder (`aws_sns_topic.<label>.arn`, `aws_sqs_queue.<label>.arn`) or carry a literal ARN. The subscription is applied only when the endpoint resource is part of the selected resources:
 
 ```hcl
-resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
-  topic_arn            = aws_sns_topic.nimbus_topic.arn
+resource "aws_sns_topic_subscription" "orders_status_to_events" {
+  topic_arn            = aws_sns_topic.orders_status.arn
   protocol             = "sqs"
-  endpoint             = aws_sqs_queue.nimbus_queue.arn
+  endpoint             = aws_sqs_queue.orders_events.arn
   raw_message_delivery = true
 }
 ```
@@ -285,10 +285,10 @@ resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
 `filter_policy` is supported through `jsonencode`, with one attribute per line and a valid JSON value on each of them (nested objects are not parsed):
 
 ```hcl
-resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
-  topic_arn = aws_sns_topic.nimbus_topic.arn
+resource "aws_sns_topic_subscription" "orders_status_to_events" {
+  topic_arn = aws_sns_topic.orders_status.arn
   protocol  = "sqs"
-  endpoint  = aws_sqs_queue.nimbus_queue.arn
+  endpoint  = aws_sqs_queue.orders_events.arn
 
   filter_policy       = jsonencode({
     eventType = ["created", "updated"]
@@ -303,8 +303,8 @@ resource "aws_sns_topic_subscription" "nimbus_topic_to_queue" {
 The parser looks for `name`, which an `aws_s3_bucket` block does not have, so the bucket name is derived from the label with `_` replaced by `-`. Keep the label and the `bucket` value aligned:
 
 ```hcl
-resource "aws_s3_bucket" "nimbus_bucket" {
-  bucket = "nimbus-bucket"
+resource "aws_s3_bucket" "orders_invoices" {
+  bucket = "orders-invoices"
 }
 ```
 
@@ -313,8 +313,8 @@ resource "aws_s3_bucket" "nimbus_bucket" {
 The table is always created with a single `id` partition key of type `S` and `PAY_PER_REQUEST` billing, regardless of the keys declared in the file:
 
 ```hcl
-resource "aws_dynamodb_table" "nimbus_table" {
-  name         = "nimbus-table"
+resource "aws_dynamodb_table" "orders_table" {
+  name         = "orders-table"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id"
 
@@ -330,12 +330,12 @@ resource "aws_dynamodb_table" "nimbus_table" {
 Only `name` is used. The state machine is created in the emulator with a single pass-through state, so the `definition` below is kept for real Terraform runs and for documentation:
 
 ```hcl
-resource "aws_sfn_state_machine" "nimbus_flow" {
-  name     = "nimbus-flow"
+resource "aws_sfn_state_machine" "orders_flow" {
+  name     = "orders-flow"
   role_arn = "arn:aws:iam::000000000000:role/stepfunctions-role"
 
   definition = jsonencode({
-    Comment = "nimbus-flow",
+    Comment = "orders-flow",
     StartAt = "HelloWorld",
     States  = {
       HelloWorld = { Type = "Pass", End = true }
@@ -349,8 +349,8 @@ resource "aws_sfn_state_machine" "nimbus_flow" {
 The name comes from `cluster_id`. With `engine = "redis"` the app creates a replication group; with `engine = "memcached"` it creates a cache cluster using `num_cache_nodes`:
 
 ```hcl
-resource "aws_elasticache_cluster" "nimbus_cache" {
-  cluster_id      = "nimbus-cache"
+resource "aws_elasticache_cluster" "orders_cache" {
+  cluster_id      = "orders-cache"
   engine          = "redis"
   node_type       = "cache.t3.micro"
   num_cache_nodes = 1
@@ -365,8 +365,8 @@ The parser only reads quoted values, so an unquoted `num_cache_nodes = 1` falls 
 `name` is required for this type. A Terraform block label cannot contain a slash, so the usual fallback to the label would invent a wrong parameter name — a block without `name` is skipped by the app instead.
 
 ```hcl
-resource "aws_ssm_parameter" "nimbus_db_host" {
-  name  = "/nimbus/db/host"
+resource "aws_ssm_parameter" "orders_db_host" {
+  name  = "/orders/db/host"
   type  = "String"
   value = "localhost"
 }
