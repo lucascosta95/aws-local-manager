@@ -70,9 +70,9 @@ class DashboardViewModel(
                 serviceHealthRepository.refresh(ep).fold(
                     onSuccess = { services ->
                         val (supported, unsupported) =
-                            services.partition { svc ->
-                                svc.name.lowercase() in supportedHealthKeys
-                            }
+                            services
+                                .sortedBy { it.displayName.lowercase() }
+                                .partition { svc -> svc.name.lowercase() in supportedHealthKeys }
 
                         val statuses = serviceStatusChecker.checkAll(ep)
                         _state.update {

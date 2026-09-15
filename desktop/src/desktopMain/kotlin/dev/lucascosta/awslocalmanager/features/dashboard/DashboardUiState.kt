@@ -15,5 +15,5 @@ data class DashboardUiState(
     val selectedFilter: AppServiceStatus? = null,
     val lastUpdated: String = EMPTY_STRING,
     val endpoint: String = EMPTY_STRING,
-    val showUnsupportedServices: Boolean = true,
+    val showUnsupportedServices: Boolean = false,
 )

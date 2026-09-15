@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,12 +14,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Refresh
@@ -43,6 +45,7 @@ import dev.lucascosta.awslocalmanager.data.model.aws.AwsResourceDefinition
 import dev.lucascosta.awslocalmanager.data.model.aws.AwsService
 import dev.lucascosta.awslocalmanager.data.model.aws.ResourceRegistry
 import dev.lucascosta.awslocalmanager.data.model.health.AppServiceStatus
+import dev.lucascosta.awslocalmanager.features.dashboard.components.AppServiceStatusDot
 import dev.lucascosta.awslocalmanager.features.dashboard.components.ServiceCard
 import dev.lucascosta.awslocalmanager.features.dashboard.components.UnsupportedServicesSection
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
@@ -137,6 +140,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = koinInject()) {
                     selected = state.selectedFilter == status,
                     onClick = { viewModel.setFilter(status) },
                     label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                    leadingIcon = status?.let { { AppServiceStatusDot(it, size = 12.dp) } },
                     shape = RoundedCornerShape(16.dp),
                 )
             }
@@ -182,28 +186,27 @@ fun DashboardScreen(viewModel: DashboardViewModel = koinInject()) {
                 }
 
                 else -> {
-                    val listState = rememberLazyListState()
+                    val scrollState = rememberScrollState()
 
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize().padding(end = 12.dp),
-                    ) {
-                        item {
-                            if (filteredServices.isNotEmpty()) {
-                                Text(
-                                    text = strings.dashboardSupportedServicesTitle,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                                )
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(end = 12.dp)) {
+                        // SpaceBetween keeps the other services next to the bottom edge while everything fits, and the
+                        // minimum height turns into a normal scroll once they are expanded.
+                        Column(
+                            modifier = Modifier.fillMaxWidth().heightIn(min = maxHeight).verticalScroll(scrollState),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column {
+                                if (filteredServices.isNotEmpty()) {
+                                    Text(
+                                        text = strings.dashboardSupportedServicesTitle,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                    )
+                                }
+                                SupportedServicesGrid(filteredServices, state.serviceStatuses)
                             }
-                        }
 
-                        item {
-                            SupportedServicesGrid(filteredServices, state.serviceStatuses)
-                        }
-
-                        item {
                             UnsupportedServicesSection(
                                 services = state.unsupportedServices,
                                 expanded = state.showUnsupportedServices,
@@ -213,7 +216,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = koinInject()) {
                     }
 
                     VerticalScrollbar(
-                        adapter = rememberScrollbarAdapter(listState),
+                        adapter = rememberScrollbarAdapter(scrollState),
                         modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
                     )
 
@@ -229,7 +232,8 @@ fun DashboardScreen(viewModel: DashboardViewModel = koinInject()) {
     }
 }
 
-private const val SERVICES_GRID_COLUMNS = 4
+private val SERVICE_TILE_MIN_WIDTH = 240.dp
+private val SERVICE_TILE_SPACING = 12.dp
 
 @Composable
 private fun SupportedServicesGrid(
@@ -237,30 +241,24 @@ private fun SupportedServicesGrid(
     serviceStatuses: Map<AwsResourceDefinition, AppServiceStatus>,
 ) {
     if (services.isEmpty()) return
-    val rows = services.chunked(SERVICES_GRID_COLUMNS)
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        rows.forEach { rowItems ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                rowItems.forEach { service ->
-                    Box(modifier = Modifier.weight(1f)) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        val columns = ((maxWidth + SERVICE_TILE_SPACING) / (SERVICE_TILE_MIN_WIDTH + SERVICE_TILE_SPACING)).toInt().coerceAtLeast(1)
+        Column(verticalArrangement = Arrangement.spacedBy(SERVICE_TILE_SPACING)) {
+            services.chunked(columns).forEach { rowItems ->
+                Row(horizontalArrangement = Arrangement.spacedBy(SERVICE_TILE_SPACING), modifier = Modifier.fillMaxWidth()) {
+                    rowItems.forEach { service ->
                         ServiceCard(
                             service = service,
                             appStatus = serviceStatuses[ResourceRegistry.fromHealthKey(service.name)],
+                            modifier = Modifier.weight(1f),
                         )
                     }
-                }
-                repeat(SERVICES_GRID_COLUMNS - rowItems.size) {
-                    Spacer(modifier = Modifier.weight(1f))
+                    repeat(columns - rowItems.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
+            Spacer(Modifier.height(8.dp))
         }
-
-        Spacer(Modifier.height(8.dp))
     }
 }

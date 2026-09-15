@@ -69,12 +69,14 @@ import dev.lucascosta.awslocalmanager.features.settings.SettingsViewModel
 import dev.lucascosta.awslocalmanager.features.setup.SetupViewModel
 import dev.lucascosta.awslocalmanager.features.skills.SkillsViewModel
 import dev.lucascosta.awslocalmanager.features.update.UpdateViewModel
+import dev.lucascosta.awslocalmanager.i18n.LocalDashboardStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalLanguage
 import dev.lucascosta.awslocalmanager.i18n.LocalLogsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalQuickStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalSkillsStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalStrings
+import dev.lucascosta.awslocalmanager.i18n.dashboardStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.inspectorStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.logsStringsForLanguage
 import dev.lucascosta.awslocalmanager.i18n.quickStringsForLanguage
@@ -201,6 +203,7 @@ fun AppRoot() {
         LocalSkillsStrings provides skillsStringsForLanguage(prefs.language),
         LocalLogsStrings provides logsStringsForLanguage(prefs.language),
         LocalQuickStrings provides quickStringsForLanguage(prefs.language),
+        LocalDashboardStrings provides dashboardStringsForLanguage(prefs.language),
     ) {
         DesktopAppTheme(appTheme = prefs.theme) {
             AppContent(
