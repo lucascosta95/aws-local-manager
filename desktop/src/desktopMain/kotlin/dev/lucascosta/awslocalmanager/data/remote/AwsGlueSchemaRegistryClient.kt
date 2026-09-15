@@ -71,6 +71,12 @@ class AwsGlueSchemaRegistryClient(private val endpointUrl: String) {
         return runGlue(arguments).mapCatching { stdout -> json.decodeFromString<SchemaVersionDto>(stdout).definition }
     }
 
+    suspend fun describeSchemaVersion(versionId: String): Result<String> =
+        runGlue(listOf("get-schema-version", "--schema-version-id", versionId)).mapCatching { stdout ->
+            val dto = json.decodeFromString<SchemaVersionReferenceDto>(stdout)
+            "${dto.schemaArn.substringAfter(":schema/")} v${dto.versionNumber}"
+        }
+
     private suspend fun runGlue(arguments: List<String>): Result<String> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -124,6 +130,12 @@ class AwsGlueSchemaRegistryClient(private val endpointUrl: String) {
         @SerialName("SchemaVersionId") val versionId: String = "",
         @SerialName("Status") val status: String = "",
         @SerialName("CreatedTime") val createdTime: String = "",
+    )
+
+    @Serializable
+    private data class SchemaVersionReferenceDto(
+        @SerialName("SchemaArn") val schemaArn: String = "",
+        @SerialName("VersionNumber") val versionNumber: Long = 0,
     )
 
     @Serializable

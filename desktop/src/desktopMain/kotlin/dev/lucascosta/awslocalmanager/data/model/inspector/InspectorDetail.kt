@@ -1,5 +1,7 @@
 package dev.lucascosta.awslocalmanager.data.model.inspector
 
+import dev.lucascosta.awslocalmanager.data.remote.KafkaRecordPayload
+
 data class SqsInspectorMessage(
     val messageId: String,
     val body: String,
@@ -40,7 +42,7 @@ data class MskInspectorRecord(
     val offset: Long,
     val timestamp: Long,
     val key: String,
-    val value: String,
+    val value: KafkaRecordPayload,
     val headers: Map<String, String>,
 )
 
@@ -140,5 +142,6 @@ sealed class InspectorDetail {
         val schemas: List<MskInspectorSchema> = emptyList(),
         val selectedTopic: String? = null,
         val records: List<MskInspectorRecord> = emptyList(),
+        val glueSchemaLabels: Map<String, String> = emptyMap(),
     ) : InspectorDetail()
 }

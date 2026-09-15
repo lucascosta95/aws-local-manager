@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.util.Base64
 
 data class KafkaTopicInfo(
     val name: String,
@@ -18,7 +19,7 @@ data class KafkaRecord(
     val offset: Long,
     val timestamp: Long,
     val key: String,
-    val value: String,
+    val value: KafkaRecordPayload,
     val headers: Map<String, String>,
 )
 
@@ -46,6 +47,10 @@ class KafkaBrokerClient {
         // Kafka tooling reserves a leading underscore for internal topics, such as _schemas, which backs the schema registry.
         const val INTERNAL_TOPIC_PREFIX = "_"
         val producedPattern = Regex("""Produced to partition (\d+) at offset (\d+)""")
+
+        // Base64 keeps binary keys, values and headers on a single space-separated line.
+        const val RECORD_FORMAT = "%p %o %d %k{base64} %v{base64} %h{%k{base64}:%v{base64},}\\n"
+        const val RECORD_REQUIRED_FIELDS = 5
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -129,17 +134,36 @@ class KafkaBrokerClient {
                 partition.partition.toString(),
                 "--offset",
                 "$from:${partition.highWatermark}",
+                "--use-schema-registry=value",
                 "--format",
-                "json",
-                "--pretty-print=false",
+                RECORD_FORMAT,
             )
-        return runRpk(container, arguments).mapCatching { stdout ->
-            stdout.lineSequence()
-                .filter { it.isNotBlank() }
-                .map { line -> json.decodeFromString<RecordDto>(line).toRecord() }
-                .toList()
+        return runRpkCapturingBoth(container, arguments).mapCatching { output ->
+            output.lineSequence().filter { it.isNotBlank() }.mapNotNull(::parseRecord).toList()
         }
     }
+
+    private fun parseRecord(line: String): KafkaRecord? {
+        val fields = line.split(" ")
+        if (fields.size < RECORD_REQUIRED_FIELDS) return null
+        val (partition, offset, timestamp) = fields
+        val (key, value) = fields.drop(3)
+        // Output is trimmed, so a last record without headers loses its trailing separator and the headers field.
+        val headers = fields.getOrElse(RECORD_REQUIRED_FIELDS) { "" }
+        return KafkaRecord(
+            partition = partition.toIntOrNull() ?: return null,
+            offset = offset.toLongOrNull() ?: return null,
+            timestamp = timestamp.toLongOrNull() ?: return null,
+            key = decodeText(key),
+            value = KafkaRecordPayload.fromBase64(value),
+            headers =
+                headers.split(",").filter { it.contains(":") }.associate { header ->
+                    decodeText(header.substringBefore(":")) to decodeText(header.substringAfter(":"))
+                },
+        )
+    }
+
+    private fun decodeText(base64: String) = String(Base64.getDecoder().decode(base64), Charsets.UTF_8)
 
     suspend fun listConsumerGroups(container: String): Result<List<KafkaConsumerGroup>> =
         runRpk(container, listOf("group", "list", "--format", "json")).mapCatching { stdout ->
@@ -163,6 +187,19 @@ class KafkaBrokerClient {
                     val schema = runRpk(container, arguments).getOrThrow()
                     KafkaSchemaSubject(latest.subject, latest.version, latest.id, latest.type, schema)
                 }
+        }
+
+    // With --use-schema-registry, rpk prints records it cannot decode through the registry to stderr instead of stdout.
+    private suspend fun runRpkCapturingBoth(
+        container: String,
+        arguments: List<String>,
+    ): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val result = ProcessRunner.run(KafkaBrokerCommands.rpk(container, arguments)).getOrThrow()
+                check(result.exitCode == 0) { result.stderr.ifBlank { "rpk ${arguments.take(2).joinToString(" ")} failed" } }
+                result.stdout + "\n" + result.stderr
+            }
         }
 
     private suspend fun runRpk(
@@ -201,32 +238,6 @@ class KafkaBrokerClient {
         val partition: Int,
         @SerialName("log_start_offset") val logStartOffset: Long = 0,
         @SerialName("high_watermark") val highWatermark: Long = 0,
-    )
-
-    @Serializable
-    private data class RecordDto(
-        val key: String = "",
-        val value: String = "",
-        val headers: List<HeaderDto> = emptyList(),
-        val timestamp: Long = 0,
-        val partition: Int = 0,
-        val offset: Long = 0,
-    ) {
-        fun toRecord() =
-            KafkaRecord(
-                partition = partition,
-                offset = offset,
-                timestamp = timestamp,
-                key = key,
-                value = value,
-                headers = headers.associate { it.key to it.value },
-            )
-    }
-
-    @Serializable
-    private data class HeaderDto(
-        val key: String,
-        val value: String = "",
     )
 
     @Serializable

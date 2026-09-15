@@ -129,6 +129,9 @@ data class InspectorStrings(
     val inspectorMskKeyColumn: String,
     val inspectorMskValueColumn: String,
     val inspectorMskHeadersColumn: String,
+    val inspectorMskGlueEncodedValue: String,
+    val inspectorMskConfluentEncodedValue: String,
+    val inspectorMskBinaryValue: String,
     val copyInput: String,
     val copyOutput: String,
 )
@@ -252,6 +255,9 @@ val InspectorStringsEnUs =
         inspectorMskKeyColumn = "Key",
         inspectorMskValueColumn = "Value",
         inspectorMskHeadersColumn = "Headers",
+        inspectorMskGlueEncodedValue = "[Glue Schema Registry · {schema}] binary payload, {bytes} bytes",
+        inspectorMskConfluentEncodedValue = "[Confluent schema id {id} not found in the registry] {bytes} bytes",
+        inspectorMskBinaryValue = "[binary, {bytes} bytes] {base64}",
         copyInput = "Copy input",
         copyOutput = "Copy output",
     )
@@ -375,6 +381,9 @@ val InspectorStringsPtBr =
         inspectorMskKeyColumn = "Chave",
         inspectorMskValueColumn = "Valor",
         inspectorMskHeadersColumn = "Headers",
+        inspectorMskGlueEncodedValue = "[Glue Schema Registry · {schema}] payload binário, {bytes} bytes",
+        inspectorMskConfluentEncodedValue = "[Schema Confluent id {id} não encontrado no registry] {bytes} bytes",
+        inspectorMskBinaryValue = "[binário, {bytes} bytes] {base64}",
         copyInput = "Copiar input",
         copyOutput = "Copiar output",
     )

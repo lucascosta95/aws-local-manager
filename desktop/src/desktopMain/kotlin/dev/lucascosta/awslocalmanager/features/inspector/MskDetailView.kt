@@ -31,6 +31,8 @@ import dev.lucascosta.awslocalmanager.constants.AppConstants.MSK_BROKER_PORT
 import dev.lucascosta.awslocalmanager.constants.AppConstants.SCHEMA_REGISTRY_PORT
 import dev.lucascosta.awslocalmanager.data.model.inspector.InspectorDetail
 import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorRecord
+import dev.lucascosta.awslocalmanager.data.remote.KafkaRecordPayload
+import dev.lucascosta.awslocalmanager.i18n.InspectorStrings
 import dev.lucascosta.awslocalmanager.i18n.LocalInspectorStrings
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -209,9 +211,12 @@ private fun MskRecordsSection(
                         TableColumn(strings.inspectorMskValueColumn, 0.36f),
                         TableColumn(strings.inspectorMskHeadersColumn, 0.14f),
                     ),
-                rows = detail.records.map { it.toRow() },
+                rows = detail.records.map { it.toRow(describePayload(it.value, detail.glueSchemaLabels, strings)) },
                 emptyMessage = strings.inspectorMskNoMessages,
-                onRowCopy = { index -> detail.records[index].toJson() },
+                onRowCopy = { index ->
+                    val record = detail.records[index]
+                    record.toJson(describePayload(record.value, detail.glueSchemaLabels, strings))
+                },
                 modifier = Modifier.fillMaxWidth().height(tableHeight(detail.records.size, maxHeight = 480.dp)),
             )
         }
@@ -233,22 +238,43 @@ private fun tableHeight(
     maxHeight: Dp = 240.dp,
 ): Dp = ((rowCount * 32) + 40).dp.coerceIn(120.dp, maxHeight)
 
-private fun MskInspectorRecord.toRow(): List<String> =
+private fun describePayload(
+    payload: KafkaRecordPayload,
+    glueSchemaLabels: Map<String, String>,
+    strings: InspectorStrings,
+): String =
+    when (payload) {
+        is KafkaRecordPayload.Text -> payload.text
+        is KafkaRecordPayload.GlueEncoded ->
+            strings.inspectorMskGlueEncodedValue
+                .replace("{schema}", glueSchemaLabels[payload.schemaVersionId] ?: payload.schemaVersionId)
+                .replace("{bytes}", payload.sizeBytes.toString())
+        is KafkaRecordPayload.ConfluentEncoded ->
+            strings.inspectorMskConfluentEncodedValue
+                .replace("{id}", payload.schemaId.toString())
+                .replace("{bytes}", payload.sizeBytes.toString())
+        is KafkaRecordPayload.Binary ->
+            strings.inspectorMskBinaryValue
+                .replace("{bytes}", payload.sizeBytes.toString())
+                .replace("{base64}", payload.base64)
+    }
+
+private fun MskInspectorRecord.toRow(valueText: String): List<String> =
     listOf(
         partition.toString(),
         offset.toString(),
         recordTimeFormatter.format(Instant.ofEpochMilli(timestamp)),
         key,
-        value,
+        valueText,
         headers.entries.joinToString(", ") { (name, headerValue) -> "$name=$headerValue" },
     )
 
-private fun MskInspectorRecord.toJson(): String =
+private fun MskInspectorRecord.toJson(valueText: String): String =
     buildJsonObject {
         put("partition", partition)
         put("offset", offset)
         put("timestamp", timestamp)
         put("key", key)
-        put("value", value)
+        put("value", valueText)
         put("headers", buildJsonObject { headers.forEach { (name, headerValue) -> put(name, JsonPrimitive(headerValue)) } })
     }.toString()

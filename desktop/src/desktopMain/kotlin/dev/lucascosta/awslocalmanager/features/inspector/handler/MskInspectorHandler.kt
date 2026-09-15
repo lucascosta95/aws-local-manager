@@ -10,16 +10,19 @@ import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorGroup
 import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorRecord
 import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorSchema
 import dev.lucascosta.awslocalmanager.data.model.inspector.MskInspectorTopic
+import dev.lucascosta.awslocalmanager.data.remote.AwsGlueSchemaRegistryClient
 import dev.lucascosta.awslocalmanager.data.remote.AwsMskClient
 import dev.lucascosta.awslocalmanager.data.remote.HostProxy
 import dev.lucascosta.awslocalmanager.data.remote.HostProxyClient
 import dev.lucascosta.awslocalmanager.data.remote.HostProxyKind
 import dev.lucascosta.awslocalmanager.data.remote.KafkaBrokerClient
+import dev.lucascosta.awslocalmanager.data.remote.KafkaRecordPayload
 import dev.lucascosta.awslocalmanager.data.remote.MskClusterInfo
 
 class MskInspectorHandler(
     private val brokerClient: KafkaBrokerClient = KafkaBrokerClient(),
     private val proxyClient: HostProxyClient = HostProxyClient(),
+    private val glueClientFactory: (String) -> AwsGlueSchemaRegistryClient = ::AwsGlueSchemaRegistryClient,
 ) : InspectorServiceHandler {
     companion object {
         const val SUMMARY_TYPE = "msk"
@@ -77,6 +80,16 @@ class MskInspectorHandler(
         )
     }
 
+    private suspend fun resolveGlueSchemas(
+        endpoint: String,
+        records: List<MskInspectorRecord>,
+    ): Map<String, String> {
+        val versionIds = records.mapNotNull { (it.value as? KafkaRecordPayload.GlueEncoded)?.schemaVersionId }.distinct()
+        if (versionIds.isEmpty()) return emptyMap()
+        val glue = glueClientFactory(endpoint)
+        return versionIds.mapNotNull { id -> glue.describeSchemaVersion(id).getOrNull()?.let { id to it } }.toMap()
+    }
+
     private fun List<HostProxy>.hostAddress(
         kind: HostProxyKind,
         cluster: String,
@@ -95,6 +108,6 @@ class MskInspectorHandler(
             brokerClient.consumeLatest(container, subItemId, RECORDS_LIMIT).getOrThrow().map { record ->
                 MskInspectorRecord(record.partition, record.offset, record.timestamp, record.key, record.value, record.headers)
             }
-        return detail.copy(selectedTopic = subItemId, records = records)
+        return detail.copy(selectedTopic = subItemId, records = records, glueSchemaLabels = resolveGlueSchemas(endpoint, records))
     }
 }
