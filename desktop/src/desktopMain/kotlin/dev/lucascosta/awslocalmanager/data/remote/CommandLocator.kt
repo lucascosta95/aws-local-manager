@@ -13,7 +13,7 @@ object CommandLocator {
     private const val PATH_VARIABLE = "PATH"
     private const val SHELL_VARIABLE = "SHELL"
     private const val SHELL_PATH_MARKER = "__AWS_LOCAL_MANAGER_PATH__"
-    private const val SHELL_TIMEOUT_SECONDS = 5L
+    private const val SHELL_TIMEOUT_SECONDS = 2L
 
     private val homeDir: String get() = System.getProperty(USER_HOME) ?: EMPTY_STRING
 
@@ -34,7 +34,8 @@ object CommandLocator {
     private val inheritedDirs: List<String>
         get() = System.getenv(PATH_VARIABLE).orEmpty().split(File.pathSeparator).filter { it.isNotBlank() }
 
-    // The user's terminal PATH, so a CLI installed outside the well-known dirs is still found.
+    // The user's login shell PATH, so a CLI installed outside the well-known dirs is still found. Non-interactive,
+    // because an interactive zsh with no terminal can hang on prompt plugins.
     private val loginShellDirs: List<String> by lazy { readLoginShellPath() }
 
     private val resolved = ConcurrentHashMap<String, String>()
@@ -43,7 +44,7 @@ object CommandLocator {
         if (command.contains(File.separatorChar)) {
             return command
         }
-        return resolved.getOrPut(command) { search(command) ?: command }
+        return resolved.computeIfAbsent(command) { search(it) ?: it }
     }
 
     fun searchPath(): String = searchDirs().joinToString(File.pathSeparator)
@@ -79,7 +80,7 @@ object CommandLocator {
         val shell = System.getenv(SHELL_VARIABLE)?.takeIf { File(it).canExecute() } ?: return emptyList()
         return runCatching {
             val process =
-                ProcessBuilder(shell, "-ilc", "printf '$SHELL_PATH_MARKER%s$SHELL_PATH_MARKER' \"\$PATH\"")
+                ProcessBuilder(shell, "-lc", "printf '$SHELL_PATH_MARKER%s$SHELL_PATH_MARKER' \"\$PATH\"")
                     .redirectInput(ProcessBuilder.Redirect.from(File("/dev/null")))
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start()
